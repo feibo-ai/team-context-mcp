@@ -12,7 +12,7 @@ function escapeRegex(s: string): string {
 /** Return section body (text between `## Name` and next H2), trimmed. Or null. */
 export function findSection(text: string, name: string): string | null {
   const pattern = new RegExp(
-    `^##\\s+${escapeRegex(name)}\\s*$([\\s\\S]*?)(?=^##\\s|\\Z)`,
+    `^##\\s+${escapeRegex(name)}\\s*$([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`,
     'm'
   );
   const m = text.match(pattern);
@@ -23,7 +23,7 @@ export function findSection(text: string, name: string): string | null {
 /** Replace section content. If section missing, return text unchanged. */
 export function replaceSection(text: string, name: string, body: string): string {
   const pattern = new RegExp(
-    `(^##\\s+${escapeRegex(name)}\\s*$)([\\s\\S]*?)(?=^##\\s|\\Z)`,
+    `(^##\\s+${escapeRegex(name)}\\s*$)([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`,
     'm'
   );
   if (!pattern.test(text)) return text;
