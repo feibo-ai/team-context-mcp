@@ -1,0 +1,59 @@
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
+import { dirname, basename, join, extname } from 'node:path';
+import { z } from 'zod';
+import matter from 'gray-matter';
+import type { MulticaClient } from '../lib/multica.js';
+import { upsertSection } from '../lib/markdown.js';
+
+export const planUpgradeInput = z.object({
+  planPath: z.string(),
+  multicaIssueId: z.string(),
+  reason: z.string().min(10),
+});
+
+export type PlanUpgradeInput = z.infer<typeof planUpgradeInput>;
+
+export async function planUpgrade(
+  raw: PlanUpgradeInput,
+  deps: { client: MulticaClient }
+): Promise<{ oldVersion: string; newVersion: string; snapshotPath: string }> {
+  const input = planUpgradeInput.parse(raw);
+
+  const text = await readFile(input.planPath, 'utf-8');
+  const { data, content } = matter(text);
+  const oldVersion = String(data.version || '1.0');
+  const newVersion = bumpVersion(oldVersion);
+
+  // Snapshot
+  const dir = dirname(input.planPath);
+  const stem = basename(input.planPath, extname(input.planPath));
+  const snapshotPath = join(dir, `${stem}_v${oldVersion}.md`);
+  await copyFile(input.planPath, snapshotPath);
+
+  // Update version
+  data.version = newVersion;
+  const ts = new Date().toISOString();
+  const upgradeEntry = [
+    `### ${ts} · ${oldVersion} → ${newVersion}`,
+    '',
+    `**Reason**: ${input.reason}`,
+    `**Snapshot**: \`${basename(snapshotPath)}\``,
+  ].join('\n');
+
+  const existingLog = matter.stringify('', data); // get fresh frontmatter
+  const upgradedBody = upsertSection(content, 'Upgrade Log', upgradeEntry);
+  const newText = matter.stringify(upgradedBody, data);
+  await writeFile(input.planPath, newText, 'utf-8');
+
+  // Re-label multica issue: remove plan-approved, add plan-draft (will need re-review)
+  await deps.client.addLabel(input.multicaIssueId, 'plan-upgraded');
+  await deps.client.addLabel(input.multicaIssueId, 'plan-draft');
+
+  return { oldVersion, newVersion, snapshotPath };
+}
+
+function bumpVersion(v: string): string {
+  const parts = v.split('.').map(Number);
+  parts[1] = (parts[1] || 0) + 1;
+  return parts.join('.');
+}
