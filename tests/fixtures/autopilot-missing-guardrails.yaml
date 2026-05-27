@@ -1,0 +1,10 @@
+name: bad-autopilot
+description: no guardrails section
+mode: run_only
+agent:
+  name: bad-bot
+prompt: |
+  Dangerous prompt
+trigger:
+  cron: "0 18 * * *"
+  timezone: Asia/Shanghai

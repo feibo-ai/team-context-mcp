@@ -18,6 +18,7 @@
     "gray-matter": "^4.0.3",
     "simple-git": "^3.27.0",
     "undici": "^7.0.0",
+    "yaml": "^2.9.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
@@ -30,6 +31,8 @@
     "node": ">=20"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
