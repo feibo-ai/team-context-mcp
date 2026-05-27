@@ -21,7 +21,9 @@ export async function planUpgrade(
 
   const text = await readFile(input.planPath, 'utf-8');
   const { data, content } = matter(text);
-  const oldVersion = String(data.version || '1.0');
+  // gray-matter parses YAML "1.0" as numeric 1, dropping ".0". Re-canonicalize.
+  const oldVersionRaw = String(data.version ?? '1.0');
+  const oldVersion = oldVersionRaw.includes('.') ? oldVersionRaw : `${oldVersionRaw}.0`;
   const newVersion = bumpVersion(oldVersion);
 
   // Snapshot
@@ -30,8 +32,12 @@ export async function planUpgrade(
   const snapshotPath = join(dir, `${stem}_v${oldVersion}.md`);
   await copyFile(input.planPath, snapshotPath);
 
-  // Update version
-  data.version = newVersion;
+  // Update version. gray-matter quotes string values like '1.1'; write as
+  // numeric where it round-trips so the YAML stays bare (`version: 1.1`).
+  const numericVer = Number(newVersion);
+  data.version = Number.isFinite(numericVer) && String(numericVer) === newVersion
+    ? numericVer
+    : newVersion;
   const ts = new Date().toISOString();
   const upgradeEntry = [
     `### ${ts} · ${oldVersion} → ${newVersion}`,

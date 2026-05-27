@@ -10,25 +10,24 @@ const responseSchema = z.object({
   q3: z.enum(['yes', 'no']),
 });
 
+// Note: zod's discriminatedUnion requires raw ZodObject members (no .refine).
+// The "collect requires responses[] OR teamEmails[]" cross-field check moved
+// to a runtime guard at the top of the collect branch below.
 export const burnoutCheckDistributeInput = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('distribute'),
-    teamEmails: z.array(z.string().email()).min(1),
+    // Internal team uses compact addresses (alice@x) — accept email-shape, not RFC strict.
+    teamEmails: z.array(z.string().regex(/^.+@.+$/)).min(1),
     month: z.string().regex(/^\d{4}-\d{2}$/),
   }),
   z.object({
     action: z.literal('collect'),
     month: z.string().regex(/^\d{4}-\d{2}$/),
     teamContextRepo: z.string(),
-    // Either: caller supplies responses (manual / external survey fallback)
     responses: z.array(responseSchema).optional(),
-    // Or: caller supplies teamEmails so we auto-scrape P2P history via feishu-cli
-    teamEmails: z.array(z.string().email()).optional(),
-    driEmail: z.string().email(),
-  }).refine(
-    (v) => (v.responses && v.responses.length > 0) || (v.teamEmails && v.teamEmails.length > 0),
-    { message: 'collect requires either responses[] or teamEmails[]' },
-  ),
+    teamEmails: z.array(z.string().regex(/^.+@.+$/)).optional(),
+    driEmail: z.string().regex(/^.+@.+$/),
+  }),
 ]);
 
 const QUESTIONS = [
@@ -110,6 +109,13 @@ export async function burnoutCheckDistribute(
   }
 
   if (input.action === 'collect') {
+    // Cross-field guard (moved out of schema — see note above the union).
+    const hasResponses = (input.responses?.length ?? 0) > 0;
+    const hasEmails = (input.teamEmails?.length ?? 0) > 0;
+    if (!hasResponses && !hasEmails) {
+      throw new Error('collect requires either responses[] or teamEmails[]');
+    }
+
     // Path A: caller supplied responses (manual / external form). Use as-is.
     // Path B: caller supplied teamEmails. Auto-scrape via feishu-cli.
     let responses: Array<z.infer<typeof responseSchema>> = [];

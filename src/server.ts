@@ -12,6 +12,15 @@ import { caseCreate, caseCreateInput } from './tools/case_create.js';
 import { casePromoteRule, casePromoteRuleInput } from './tools/case_promote_rule.js';
 import { skillLint, skillLintInput } from './tools/skill_lint.js';
 import { monthlyHealthReport, monthlyHealthReportInput } from './tools/monthly_health_report.js';
+import { planUpgrade, planUpgradeInput } from './tools/plan_upgrade.js';
+import { projectKickoff, projectKickoffInput } from './tools/project_kickoff.js';
+import { bettingTableCapture, bettingTableCaptureInput } from './tools/betting_table_capture.js';
+import { burnoutCheckDistribute, burnoutCheckDistributeInput } from './tools/burnout_check_distribute.js';
+import { autopilotLint, autopilotLintInput } from './tools/autopilot_lint.js';
+import { caseReview, caseReviewInput } from './tools/case_review.js';
+import { shouldIUseAi, shouldIUseAiInput } from './tools/should_i_use_ai.js';
+import { codeReviewRequest, codeReviewRequestInput } from './tools/code_review_request.js';
+import { researchCreate, researchCreateInput } from './tools/research_create.js';
 import { z } from 'zod';
 
 type ToolDef = {
@@ -38,6 +47,26 @@ const TOOLS: ToolDef[] = [
     schema: skillLintInput, handler: (i, d) => skillLint(i as any, d) },
   { name: 'monthly_health_report', description: 'Generate SOP-aligned monthly health report.',
     schema: monthlyHealthReportInput, handler: (i, d) => monthlyHealthReport(i as any, d) },
+  // ── Addendum v0.2: 4 more tools (B1-B4) ─────────────────────────────────
+  { name: 'plan_upgrade', description: 'Snapshot current plan version and bump (v1.0 → v1.1). Re-labels for review.',
+    schema: planUpgradeInput, handler: (i, d) => planUpgrade(i as any, d) },
+  { name: 'project_kickoff', description: 'Phase 01 kickoff: create multica project + research/plan stubs + broadcast.',
+    schema: projectKickoffInput, handler: (i, d) => projectKickoff(i as any, d) },
+  { name: 'betting_table_capture', description: 'Friday betting-table issue (open / close / tally).',
+    schema: bettingTableCaptureInput, handler: (i, d) => bettingTableCapture(i as any, d) },
+  { name: 'burnout_check_distribute', description: 'Monthly anonymized burnout check (distribute / collect).',
+    schema: burnoutCheckDistributeInput, handler: (i, d) => burnoutCheckDistribute(i as any, d) },
+  // ── 5 red-line tools (B6-B10) ───────────────────────────────────────────
+  { name: 'autopilot_lint', description: 'Lint autopilot YAML against PB-04 guardrails + budget cap.',
+    schema: autopilotLintInput, handler: (i, d) => autopilotLint(i as any, d) },
+  { name: 'case_review', description: 'Section 4 review gate. Refuses if section is trivial; signs and labels reviewed.',
+    schema: caseReviewInput, handler: (i, d) => caseReview(i as any, d) },
+  { name: 'should_i_use_ai', description: 'METR-aligned decision aid: use-ai / write-directly / borderline.',
+    schema: shouldIUseAiInput, handler: (i, d) => shouldIUseAi(i as any, d) },
+  { name: 'code_review_request', description: 'Block self-review (❌1). Assign a reviewer + code-review label.',
+    schema: codeReviewRequestInput, handler: (i, d) => codeReviewRequest(i as any, d) },
+  { name: 'research_create', description: 'RPI Research phase skeleton + multica research-labelled issue.',
+    schema: researchCreateInput, handler: (i, d) => researchCreate(i as any, d) },
 ];
 
 async function main() {

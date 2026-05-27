@@ -66,20 +66,34 @@ export async function shouldIUseAi(
     };
   }
 
-  if (proAi >= 2 && proDirect === 0) {
+  // Junior dominates: < 3y experience → AI assistance is always net positive,
+  // unless the red-line above already fired (it didn't, because that needs ≥ 5y).
+  if (input.devExperienceYears < 3) {
     return {
       recommendation: 'use-ai',
-      reason: '多个因子指向用 AI 有杠杆 (unfamiliar / 长任务 / 经验少)',
+      reason: '初级工程师 — AI 辅助在熟练之前都有杠杆',
       factors,
     };
   }
-  if (proDirect >= 2 && proAi === 0) {
+
+  // All three factors pro-direct: confident skip.
+  if (proDirect === 3) {
     return {
       recommendation: 'write-directly',
-      reason: '多个因子指向直接写更快',
+      reason: '三个因子都指向直接写更快',
       factors,
     };
   }
+
+  // Two-plus pro-ai signals (mixed allowed): clear win.
+  if (proAi >= 2) {
+    return {
+      recommendation: 'use-ai',
+      reason: '多个因子指向用 AI 有杠杆 (unfamiliar / 长任务)',
+      factors,
+    };
+  }
+
   return {
     recommendation: 'borderline',
     reason: '混合信号 — DRI / 你自己根据上下文判断。建议先试 15 分钟 AI，无进展立即切直接写。',
