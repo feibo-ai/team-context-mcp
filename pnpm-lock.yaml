@@ -7,31 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.0.0
-        version: 1.29.0(zod@3.25.76)
-      '@tcmcp/feishu':
-        specifier: workspace:*
-        version: link:packages/feishu
-      '@tcmcp/shared':
-        specifier: workspace:*
-        version: link:packages/shared
-      gray-matter:
-        specifier: ^4.0.3
-        version: 4.0.3
-      simple-git:
-        specifier: ^3.27.0
-        version: 3.36.0
-      undici:
-        specifier: ^7.0.0
-        version: 7.26.0
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
-      zod:
-        specifier: ^3.23.0
-        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -172,9 +147,15 @@ importers:
 
   packages/shared:
     dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
       simple-git:
         specifier: ^3.27.0
         version: 3.36.0
+      undici:
+        specifier: ^7.0.0
+        version: 7.26.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

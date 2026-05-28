@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./test-helpers": {
+      "types": "./dist/test-helpers/multica-mock.d.ts",
+      "default": "./dist/test-helpers/multica-mock.js"
     }
   },
   "scripts": {
@@ -17,7 +21,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "simple-git": "^3.27.0"
+    "gray-matter": "^4.0.3",
+    "simple-git": "^3.27.0",
+    "undici": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
