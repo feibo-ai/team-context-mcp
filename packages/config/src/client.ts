@@ -42,7 +42,12 @@ export class MulticaControlPlaneClient {
       const text = await res.body.text();
       throw new Error(`multica ${res.statusCode}: ${text}`);
     }
-    return (await res.body.json()) as T;
+    // 204 No Content (or any empty body) — body.json() would throw "Unexpected end of JSON".
+    // Treat as `undefined` and let the caller's <T> = void absorb it.
+    if (res.statusCode === 204) return undefined as T;
+    const text = await res.body.text();
+    if (text.length === 0) return undefined as T;
+    return JSON.parse(text) as T;
   }
 
   /**

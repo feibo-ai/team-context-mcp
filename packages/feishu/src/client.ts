@@ -49,6 +49,27 @@ export class FeishuClient {
     return this.sdk;
   }
 
+  /**
+   * Lightweight reachability + auth probe. Returns true iff:
+   *   1. FEISHU_APP_ID + FEISHU_APP_SECRET secrets are present in config
+   *   2. lark SDK token endpoint accepts the credentials (auth.v3.tenantAccessToken.internal)
+   * Used by /health (M-17) to surface `feishu_ready` — distinguishes
+   * "creds missing" from "feishu API down" from "creds wrong".
+   */
+  async ping(): Promise<boolean> {
+    try {
+      const sdk = await this.ensureSdk();
+      // The auth.v3.tenantAccessToken.internal endpoint is the cheapest probe
+      // and is what every other call hits internally for token rotation.
+      const res = await sdk.auth.tenantAccessToken.internal({
+        data: { app_id: this.lastAppId!, app_secret: this.lastAppSecret! },
+      });
+      return res.code === 0;
+    } catch {
+      return false;
+    }
+  }
+
   async msgSendText(p: { chatId: string; text: string }): Promise<{ messageId: string }> {
     const sdk = await this.ensureSdk();
     const res = await sdk.im.message.create({
