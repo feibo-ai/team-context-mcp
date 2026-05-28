@@ -95,12 +95,10 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
  && chmod 0755 /usr/local/bin/feishu-cli \
  && rm -f /tmp/feishu-cli.tar.gz
 
-# team-context bootstrap scripts + skills/autopilots/standards (public repo @ main · build-time clone).
-# Refresh on demand: `zeabur service exec -- git -C /opt/team-context pull`.
-ARG TEAM_CONTEXT_REPO=https://github.com/feibo-ai/team-context.git
-ARG TEAM_CONTEXT_REF=main
-RUN git clone --depth 1 --branch ${TEAM_CONTEXT_REF} ${TEAM_CONTEXT_REPO} /opt/team-context \
- && chown -R node:node /opt/team-context
+# NOTE · team-context repo is private · NOT bundled here.
+# Bootstrap (labels / skills / autopilots / secrets) runs via DRI's `zeabur service exec`
+# stream from local mac: `cat skills/.../SKILL.md | zeabur exec -- multica skill create --stdin`.
+# Future · if team-context made public OR runtime token-clone added, mount /opt/team-context here.
 
 # Copy manifests (needed at runtime for `node` to resolve workspace packages
 # through node_modules symlinks that pnpm creates).
