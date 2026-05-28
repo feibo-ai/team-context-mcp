@@ -1,0 +1,37 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/feibo-ai/tcmcp-remote:${{ github.ref_name }}
+            ghcr.io/feibo-ai/tcmcp-remote:latest
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+
+      - name: Trigger multica redeploy webhook
+        if: vars.MULTICA_REDEPLOY_WEBHOOK
+        run: |
+          curl -X POST "${{ vars.MULTICA_REDEPLOY_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"image\":\"ghcr.io/feibo-ai/tcmcp-remote:${{ github.ref_name }}\"}"

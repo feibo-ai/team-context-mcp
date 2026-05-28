@@ -1,5 +1,9 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,11 +22,14 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Build first so each package's d.ts files exist before downstream packages
+      # type-check (typecheck-only doesn't emit declarations · cross-pkg imports
+      # resolve via dist/index.d.ts pointed at by package.json#exports.types).
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
       - name: Typecheck
-        run: pnpm typecheck
+        run: pnpm -r --filter './packages/*' typecheck
 
       - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
+        run: pnpm -r --filter './packages/*' test

@@ -1,46 +1,107 @@
-# team-context-mcp
+# team-context-mcp v0.2 (control plane edition)
 
-MCP server enforcing AI MIQ SOP v0.4 workflow over multica + git.
+Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + Feishu.
 
-## Tools (17 total · 4 groups)
+- **`@tcmcp/remote`** — 10 tools · HTTP/SSE on `:8443/mcp` · runs in Docker on the DRI's mac · pulls config + secrets from a multica `mcp-server` integration (live, reactive to rotation)
+- **`@tcmcp/local`** — 12 tools · stdio · spawned by Claude Code / Codex CLI inside the user's repo checkout · git + file ops only
 
-### Gate · 守门 6（SOP 非妥协 #1 #2）
+22 tools total. Architecture is hybrid because some SOP gates (`plan_create`, `case_create`, `session_handoff` …) need access to the user's working tree and `git`, while broadcast / DM / Wiki / METR-decision tools have no local dependency and benefit from a single server-side process owning Feishu tokens.
+
+## Architecture
+
+```
++--------------------+       HTTP/SSE        +---------------------+
+|  Claude / Codex    | --------------------> |  @tcmcp/remote      |
+|  (any team member) |  Bearer <multica jwt> |  Docker · :8443     |
++--------------------+                       |                     |
+        |                                    |  - per-user auth    |
+        | stdio                              |    (M-16, /api/me)  |
+        v                                    |  - /health (M-17)   |
++--------------------+                       |  - DeploymentTracker|
+|  @tcmcp/local      |                       |    (M-18)           |
+|  (per-checkout)    |                       +----------+----------+
++--------------------+                                  |
+        |                                               | REST + WS
+        | calls multica/api/* with member's own         v
+        | bearer (same token)                +---------------------+
+        +----------------------------------> |  multica server     |
+                                             |  · integrations     |
+                                             |  · secrets (AES)    |
+                                             |  · audit_logs       |
+                                             |  · WS broadcast     |
+                                             +---------+-----------+
+                                                       |
+                                                       v
+                                             +---------------------+
+                                             |  Feishu open API    |
+                                             |  (chats / wiki /docx|
+                                             |   im.message.*)     |
+                                             +---------------------+
+```
+
+`@tcmcp/remote` boots by calling `MulticaConfigSource.start()` against `MULTICA_URL`. Config + secrets stream over WS (poll fallback). On rotation, every `FeishuClient` request rebuilds the lark SDK against the new `APP_SECRET` — no restart needed. If multica's control plane is off (404), the server falls back to env-only mode and `/health` reports `controlPlaneOk=false` honestly.
+
+## Tools
+
+### Remote (10 · HTTP/SSE · need Feishu + workspace-wide reach)
+
 | Tool | Purpose |
 | --- | --- |
-| `plan_create` | Generate plan markdown + multica plan-draft issue |
-| `plan_request_review` | Request review from a second session |
-| `plan_approve` | The SOP non-negotiable #1 gate |
-| `plan_upgrade` | Bump plan version (v1.x) + snapshot + re-review |
-| `case_create` | Generate debrief case file (5 mandatory sections) |
-| `case_promote_rule` | Promote rule from case to CLAUDE.md |
+| `plan_request_review` | Label plan under-review + post reviewer prompt to team chat. |
+| `betting_table_capture` | Friday betting-table issue (open / close / vote tally). |
+| `burnout_check_distribute` | Monthly anonymous burnout survey · distribute (P2P) + collect (read DMs). |
+| `should_i_use_ai` | METR factor model — use-ai / write-directly / borderline. |
+| `code_review_request` | ❌1 self-review prevention — assigns a different reviewer agent + label. |
+| `notify_team` | Send text or interactive card to the team Feishu chat. |
+| `dm_member` | Send a P2P direct message to a member by email. |
+| `archive_to_wiki` | Import a local markdown file as a Feishu docx + link under a wiki node. |
+| `search_chat` | Search Feishu workspace chats (maintenance helper). |
+| `read_member_dm` | Read recent P2P history for one team member (used by burnout collect). |
 
-### Sync · 协作 4（节奏 + 启动 + 收口）
+### Local (12 · stdio · need git + filesystem)
+
+Gate · 守门 6 (SOP non-negotiable #1 #2):
+
 | Tool | Purpose |
 | --- | --- |
-| `session_handoff` | Pre-clear handoff: commit WIP + update plan ## Current State |
-| `project_kickoff` | Phase 01 6-step orchestration (research + plan + multica project + broadcast) |
-| `betting_table_capture` | Friday betting table (open / close / vote tally, no backlog) |
-| `burnout_check_distribute` | Monthly anonymous burnout survey (distribute / collect via feishu-cli P2P) |
+| `plan_create` | Generate plan markdown + multica plan-draft issue. |
+| `plan_approve` | The SOP non-negotiable #1 gate. |
+| `plan_upgrade` | Bump plan version (v1.x) + snapshot + re-review. |
+| `case_create` | Generate debrief case file (5 mandatory sections). |
+| `case_review` | Section 4 review gate — refuses trivial Key judgments, signs + labels. |
+| `case_promote_rule` | Promote a rule from a case file to CLAUDE.md. |
 
-### Observe · 健康度 2（月度 review）
+Sync · 协作 2 (handoff + kickoff):
+
 | Tool | Purpose |
 | --- | --- |
-| `skill_lint` | Token + owner + 90-day staleness checks |
-| `monthly_health_report` | SOP-aligned monthly health snapshot + ancient-impossible label tally |
+| `session_handoff` | Pre-clear handoff — commit WIP + update plan `## Current State`. |
+| `project_kickoff` | Phase 01 6-step orchestration (research + plan + project + broadcast hint). |
 
-### Safety · 红线 5（PB-04 + ❌1 + ❌8 + Section 4 + RPI）
+Observe · 健康度 2 (monthly review):
+
 | Tool | Purpose |
 | --- | --- |
-| `autopilot_lint` | PB-04 guardrails + budget cap enforcement (apply-autopilots.sh pre-check) |
-| `case_review` | Section 4 review gate — refuses trivial Key judgments, signs + labels |
-| `should_i_use_ai` | ❌8 red-line guard — METR factor model (experience + familiarity + size) |
-| `code_review_request` | ❌1 self-review prevention — assigns a different reviewer agent |
-| `research_create` | RPI Research session skeleton at docs/research/ |
+| `skill_lint` | Token + owner + 90-day staleness checks. |
+| `monthly_health_report` | SOP-aligned monthly health snapshot. |
+
+Safety · 红线 2 (PB-04 + RPI):
+
+| Tool | Purpose |
+| --- | --- |
+| `autopilot_lint` | PB-04 guardrails + budget cap enforcement. |
+| `research_create` | RPI Research session skeleton at `docs/research/`. |
+
+> Drift note from the plan: Plan-5 quoted "21 = 9 remote + 12 local". After M-12 added `read_member_dm`, the actual remote count is **10**, so 22 total. Both servers' `tools/list` agree.
 
 ## Install
 
-See [INSTALL.md](./INSTALL.md).
+See [INSTALL.md](./INSTALL.md). Team members install only `@tcmcp/local` and point their MCP client at the DRI's already-running remote URL. The DRI runs `docker compose up -d` once and rotation works without redeploys.
+
+## Smoke
+
+See [SMOKE.md](./SMOKE.md). 5 round-trips cover `tools/list` on both transports and one tool per phase (gate / sync / observe / safety / remote-Feishu).
 
 ## Sister project
 
-[team-context](../team-context) — git repo of shared SOP, Skills, standards.
+[team-context](../team-context) — git repo of shared SOP, Skills, standards, and the autopilots that consume these tools.

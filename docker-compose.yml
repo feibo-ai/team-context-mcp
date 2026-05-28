@@ -1,0 +1,24 @@
+services:
+  tcmcp-remote:
+    build: .
+    image: tcmcp-remote:dev
+    ports:
+      - "127.0.0.1:8443:8443"
+    environment:
+      # macOS:  http://host.docker.internal:8083  ← current D-H decision
+      # Linux:  http://172.17.0.1:8083
+      # k8s:    http://multica-server.multica.svc.cluster.local:8083
+      MULTICA_URL: ${MULTICA_URL:-http://host.docker.internal:8083}
+      MULTICA_SERVICE_TOKEN: ${MULTICA_SERVICE_TOKEN}
+      MULTICA_WORKSPACE_ID: ${MULTICA_WORKSPACE_ID}
+      INTEGRATION_NAME: team-context-mcp
+      INTEGRATION_KIND: mcp-server
+      MCP_TRANSPORT: http
+      MCP_HTTP_PORT: 8443
+      GIT_SHA: ${GIT_SHA:-dev}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8443/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
