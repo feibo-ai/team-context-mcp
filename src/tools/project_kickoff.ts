@@ -10,7 +10,6 @@ export const projectKickoffInput = z.object({
   dri: z.string().min(1),
   goalDraft: z.string().min(10),
   appetite: z.string().default('1 week'),
-  feishuChatId: z.string().optional(),  // oc_xxx; if set, broadcast via feishu-cli
 });
 
 export async function projectKickoff(
@@ -21,6 +20,10 @@ export async function projectKickoff(
   planPath: string;
   multicaProjectId: string;
   multicaIssueId: string;
+  broadcastSuggestion: {
+    tool: 'notify_team';
+    text: string;
+  };
 }> {
   const input = projectKickoffInput.parse(raw);
   const date = new Date().toISOString().slice(0, 10);
@@ -111,26 +114,19 @@ _(empty until first handoff)_
     projectId: project.id,
   });
 
-  // Optional feishu broadcast via feishu-cli (SOP Phase 01 Step 6)
-  if (input.feishuChatId) {
-    try {
-      const { execFileSync } = await import('node:child_process');
-      const text = `[Kickoff] ${input.slug} · DRI: ${input.dri} · Appetite: ${input.appetite} · Goal: ${input.goalDraft}`;
-      execFileSync('feishu-cli', [
-        'msg', 'send',
-        '--receive-id-type', 'chat_id',
-        '--receive-id', input.feishuChatId,
-        '--text', text,
-      ], { stdio: 'pipe' });
-    } catch {
-      // best-effort; don't fail tool. log to stderr for daemon to see.
-      process.stderr.write(`[project_kickoff] feishu broadcast failed for ${input.slug}\n`);
-    }
-  }
+  // Broadcast hint: caller LLM should chain to notify_team after this returns.
+  // SOP Phase 01 Step 6 announce — handled by orchestrator, not inline shell-out.
+  const goalSnippet = input.goalDraft.length > 100
+    ? input.goalDraft.slice(0, 100) + '…'
+    : input.goalDraft;
 
   return {
     researchPath, planPath,
     multicaProjectId: project.id,
     multicaIssueId: issue.id,
+    broadcastSuggestion: {
+      tool: 'notify_team',
+      text: `Starting ${input.slug} · DRI ${input.dri} · ${goalSnippet}`,
+    },
   };
 }

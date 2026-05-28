@@ -46,6 +46,11 @@ describe('project_kickoff', () => {
     expect(r.multicaProjectId).toBe('proj_k1');
     expect(r.multicaIssueId).toBe('issue_k1');
 
+    expect(r.broadcastSuggestion.tool).toBe('notify_team');
+    expect(r.broadcastSuggestion.text.length).toBeGreaterThan(0);
+    expect(r.broadcastSuggestion.text).toContain('kickoff-test');
+    expect(r.broadcastSuggestion.text).toContain('alice');
+
     const research = await readFile(r.researchPath, 'utf-8');
     expect(research).toContain('# Research: reduce p99 latency');
     expect(research).toContain('## Question');
