@@ -22,11 +22,14 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Build first so each package's d.ts files exist before downstream packages
+      # type-check (typecheck-only doesn't emit declarations · cross-pkg imports
+      # resolve via dist/index.d.ts pointed at by package.json#exports.types).
+      - name: Build
+        run: pnpm -r --filter './packages/*' build
+
       - name: Typecheck
         run: pnpm -r --filter './packages/*' typecheck
 
       - name: Test
         run: pnpm -r --filter './packages/*' test
-
-      - name: Build
-        run: pnpm -r --filter './packages/*' build
