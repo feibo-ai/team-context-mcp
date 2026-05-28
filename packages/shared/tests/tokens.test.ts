@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { estimateTokens } from '../../src/lib/tokens.js';
+import { estimateTokens } from '../src/tokens.js';
 
 describe('estimateTokens', () => {
   it('returns 0 for empty string', () => {

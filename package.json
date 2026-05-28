@@ -1,20 +1,25 @@
 {
   "name": "team-context-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0-rc1",
   "description": "MCP server enforcing AI MIQ SOP v0.4 workflow over multica + git",
+  "private": true,
   "type": "module",
   "bin": {
     "team-context-mcp": "./dist/server.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b && pnpm -r --filter './packages/*' build",
     "dev": "tsx src/server.ts",
-    "test": "vitest run",
+    "test": "vitest run && pnpm -r --filter './packages/*' test",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && pnpm -r --filter './packages/*' typecheck",
+    "dev:local": "pnpm --filter @tcmcp/local dev",
+    "dev:remote": "pnpm --filter @tcmcp/remote dev",
+    "docker:build": "docker build -t tcmcp:dev ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@tcmcp/shared": "workspace:*",
     "gray-matter": "^4.0.3",
     "simple-git": "^3.27.0",
     "undici": "^7.0.0",

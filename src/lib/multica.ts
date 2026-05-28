@@ -1,5 +1,5 @@
 import { request } from 'undici';
-import type { MulticaIssue } from '../types.js';
+import type { MulticaIssue } from '@tcmcp/shared';
 
 export interface MulticaConfig {
   serverUrl: string;

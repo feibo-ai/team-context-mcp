@@ -3,7 +3,7 @@ import { dirname, basename, join, extname } from 'node:path';
 import { z } from 'zod';
 import matter from 'gray-matter';
 import type { MulticaClient } from '../lib/multica.js';
-import { upsertSection } from '../lib/markdown.js';
+import { upsertSection } from '@tcmcp/shared';
 
 export const planUpgradeInput = z.object({
   planPath: z.string(),

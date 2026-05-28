@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { findSection, replaceSection } from '../lib/markdown.js';
-import { estimateTokens } from '../lib/tokens.js';
+import { findSection, replaceSection } from '@tcmcp/shared';
+import { estimateTokens } from '@tcmcp/shared';
 
 export const casePromoteRuleInput = z.object({
   casePath: z.string(),

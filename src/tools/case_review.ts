@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import type { MulticaClient } from '../lib/multica.js';
-import { findSection, upsertSection } from '../lib/markdown.js';
+import { findSection, upsertSection } from '@tcmcp/shared';
 
 export const caseReviewInput = z.object({
   casePath: z.string(),

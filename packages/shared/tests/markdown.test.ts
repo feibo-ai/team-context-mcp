@@ -7,7 +7,7 @@ import {
   findSection,
   replaceSection,
   upsertSection,
-} from '../../src/lib/markdown.js';
+} from '../src/markdown.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(here, '../fixtures/plan-sample.md');

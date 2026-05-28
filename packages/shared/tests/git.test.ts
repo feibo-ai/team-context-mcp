@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import simpleGit, { SimpleGit } from 'simple-git';
-import { GitOps } from '../../src/lib/git.js';
+import { GitOps } from '../src/git.js';
 
 describe('GitOps', () => {
   let dir: string;

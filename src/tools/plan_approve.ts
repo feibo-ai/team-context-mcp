@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import type { MulticaClient } from '../lib/multica.js';
-import { replaceSection } from '../lib/markdown.js';
+import { replaceSection } from '@tcmcp/shared';
 
 export const planApproveInput = z.object({
   multicaIssueId: z.string(),

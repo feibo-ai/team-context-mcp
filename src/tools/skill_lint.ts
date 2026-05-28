@@ -2,7 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import matter from 'gray-matter';
-import { estimateTokens } from '../lib/tokens.js';
+import { estimateTokens } from '@tcmcp/shared';
 
 export const skillLintInput = z.object({
   skillsDir: z.string(),

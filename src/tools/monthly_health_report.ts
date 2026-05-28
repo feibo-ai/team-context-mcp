@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import simpleGit from 'simple-git';
 import { skillLint } from './skill_lint.js';
-import { estimateTokens } from '../lib/tokens.js';
+import { estimateTokens } from '@tcmcp/shared';
 
 export const monthlyHealthReportInput = z.object({
   teamContextRepo: z.string(),

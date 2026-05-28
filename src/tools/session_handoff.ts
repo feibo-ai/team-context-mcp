@@ -1,8 +1,8 @@
 import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { GitOps } from '../lib/git.js';
-import { upsertSection } from '../lib/markdown.js';
+import { GitOps } from '@tcmcp/shared';
+import { upsertSection } from '@tcmcp/shared';
 import type { MulticaClient } from '../lib/multica.js';
 
 export const sessionHandoffInput = z.object({
