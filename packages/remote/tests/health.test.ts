@@ -147,4 +147,43 @@ describe('healthHandler', () => {
       multica_control_plane_enabled: false,
     });
   });
+
+  it('surfaces deployment stats when tracker is wired (P3 follow-up)', async () => {
+    // When server.ts spawns a DeploymentTracker (integration_id resolved),
+    // /health should report its register status + beat counters so the DRI
+    // can answer "is multica seeing this deployment?" without grepping logs.
+    const handler = healthHandler(
+      baseDeps({
+        deployment: {
+          getStats: () => ({
+            registered: true,
+            deploymentId: 'dep_abc123',
+            beatsSucceeded: 42,
+            beatsFailed: 1,
+            lastError: 'heartbeat 503',
+          }),
+        },
+      }),
+    );
+    const { res, captured } = makeRes();
+    await handler(req, res, next);
+
+    expect(captured.body!.deployment).toEqual({
+      registered: true,
+      deployment_id: 'dep_abc123',
+      beats_succeeded: 42,
+      beats_failed: 1,
+      last_error: 'heartbeat 503',
+    });
+  });
+
+  it('omits deployment field when no tracker is passed', async () => {
+    // Backwards-compat path: existing health.ts callers (and the env-only
+    // bootstrap path where integrationId is unresolved) don't pass deployment.
+    const handler = healthHandler(baseDeps());
+    const { res, captured } = makeRes();
+    await handler(req, res, next);
+
+    expect(captured.body!.deployment).toBeUndefined();
+  });
 });

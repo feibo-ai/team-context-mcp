@@ -388,11 +388,14 @@ async function main(): Promise<void> {
     workspaceId,
   });
 
-  // Deployment tracker (best-effort; never crashes the server)
+  // Deployment tracker (best-effort; never crashes the server). Hoisted out
+  // of the `if` block so /health can surface its stats (P3 follow-up · was
+  // TODO(M-17) in deployment.ts).
   const integrationId = (multicaSource as unknown as { integrationId?: string })
     .integrationId;
+  let tracker: DeploymentTracker | undefined;
   if (controlPlaneOk && integrationId) {
-    const tracker = new DeploymentTracker({
+    tracker = new DeploymentTracker({
       client: multicaCp,
       integrationId,
       imageOrCommit: process.env.GIT_SHA ?? 'dev',
@@ -411,6 +414,7 @@ async function main(): Promise<void> {
       ping: () => multicaCp.ping(),
       controlPlaneOk,
     },
+    deployment: tracker,
   });
 
   await startServer({

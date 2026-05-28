@@ -32,10 +32,29 @@ export interface HealthFeishuClient {
   ping?(): Promise<unknown>;
 }
 
+/**
+ * Subset of DeploymentTracker (P3 follow-up · was TODO(M-17)). Optional —
+ * the tracker only spins up when an integration_id is resolved, so health
+ * must work without it. When present, surfaces register status + heartbeat
+ * success/failure counters so the DRI can answer "is multica seeing us?"
+ * without grepping logs.
+ */
+export interface HealthDeploymentTracker {
+  getStats(): {
+    registered: boolean;
+    deploymentId?: string;
+    beatsSucceeded: number;
+    beatsFailed: number;
+    lastError?: string;
+  };
+}
+
 export interface HealthDeps {
   configSource: HealthConfigSource;
   feishu: HealthFeishuClient;
   multica: HealthMulticaClient;
+  /** Optional. When omitted, `deployment` is left out of the response. */
+  deployment?: HealthDeploymentTracker;
 }
 
 export interface HealthResponse {
@@ -47,6 +66,14 @@ export interface HealthResponse {
   multica_control_plane_enabled: boolean;
   multica_reachable: boolean;
   feishu_ready: boolean;
+  /** Present only when the deployment tracker is wired (control plane up). */
+  deployment?: {
+    registered: boolean;
+    deployment_id?: string;
+    beats_succeeded: number;
+    beats_failed: number;
+    last_error?: string;
+  };
 }
 
 export function healthHandler(deps: HealthDeps): RequestHandler {
@@ -78,6 +105,16 @@ export function healthHandler(deps: HealthDeps): RequestHandler {
       out.feishu_ready = typeof deps.feishu.ping === 'function';
     } catch {
       out.feishu_ready = false;
+    }
+    if (deps.deployment) {
+      const s = deps.deployment.getStats();
+      out.deployment = {
+        registered: s.registered,
+        deployment_id: s.deploymentId,
+        beats_succeeded: s.beatsSucceeded,
+        beats_failed: s.beatsFailed,
+        last_error: s.lastError,
+      };
     }
     if (!out.multica_reachable) out.status = 'degraded';
     res.json(out);

@@ -27,8 +27,8 @@ export interface DeploymentTrackerDeps {
 
 /**
  * Tracks success/failure counts so an operator can sanity-check connectivity
- * via the health endpoint without grepping logs. Not in the plan but cheap.
- * TODO(M-17): expose via /health when M-17 wires up DeploymentTracker.
+ * via the health endpoint without grepping logs. Wired into healthHandler
+ * via the `deployment` dep (P3 follow-up · was TODO(M-17)).
  */
 export interface DeploymentStats {
   registered: boolean;
