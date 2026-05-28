@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { burnoutCheckDistribute } from '../../src/tools/burnout_check_distribute.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('burnout_check_distribute', () => {
   let dir: string;
@@ -26,11 +27,12 @@ describe('burnout_check_distribute', () => {
 
   it('stores anonymized responses and creates issue if any yes (path A: manual responses)', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'br_1' });
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     const r = await burnoutCheckDistribute({
       action: 'collect',
@@ -55,7 +57,7 @@ describe('burnout_check_distribute', () => {
   it('rejects collect with neither responses nor teamEmails', async () => {
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
     await expect(burnoutCheckDistribute({
       action: 'collect',
       month: '2026-05',

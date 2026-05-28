@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { caseCreate } from '../../src/tools/case_create.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('case_create', () => {
   let dir: string;
@@ -23,16 +24,16 @@ describe('case_create', () => {
   });
 
   it('writes case file with all 5 sections', async () => {
-    agent
-      .get('http://m.test')
-      .intercept({ path: '/api/issues', method: 'POST' })
+    const pool = agent.get('http://m.test');
+    pool.intercept({ path: '/api/issues', method: 'POST' })
       .reply(201, { id: 'c1', title: 'Debrief', status: 'open', labels: ['debrief'] });
+    interceptAnyLabelAdd(pool);
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test',
       token: 't',
       workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     const r = await caseCreate(
       {
@@ -66,17 +67,17 @@ describe('case_create', () => {
   });
 
   it('refuses to overwrite an existing case file', async () => {
-    agent
-      .get('http://m.test')
-      .intercept({ path: '/api/issues', method: 'POST' })
+    const pool = agent.get('http://m.test');
+    pool.intercept({ path: '/api/issues', method: 'POST' })
       .reply(201, { id: 'c1', title: 'Debrief', status: 'open', labels: ['debrief'] })
       .persist(); // allow first call's createIssue; second call shouldn't reach this
+    interceptAnyLabelAdd(pool);
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test',
       token: 't',
       workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     const args = {
       projectPath: dir,

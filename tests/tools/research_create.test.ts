@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { researchCreate } from '../../src/tools/research_create.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('research_create', () => {
   let dir: string;
@@ -24,9 +25,10 @@ describe('research_create', () => {
 
   it('writes research skeleton with 4 dimensions + creates issue', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_1', labels: ['research'] });
 
-    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
     const r = await researchCreate({
       projectPath: dir,
       slug: 'cache-strategy',
@@ -49,10 +51,11 @@ describe('research_create', () => {
 
   it('returns alreadyExisted=true on second call without rewriting the file', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     // Both calls hit /api/issues — research_create always logs the issue, even on re-entry.
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_a', labels: ['research'] }).persist();
 
-    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
     const args = {
       projectPath: dir,
       slug: 'cache-strategy',

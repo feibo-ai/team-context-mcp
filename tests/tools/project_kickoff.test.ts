@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { projectKickoff } from '../../src/tools/project_kickoff.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('project_kickoff', () => {
   let dir: string;
@@ -24,6 +25,7 @@ describe('project_kickoff', () => {
 
   it('creates research + plan skeletons + multica project + initial issue', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/projects', method: 'POST' })
       .reply(201, { id: 'proj_k1', title: 'kickoff-test' });
     pool.intercept({ path: '/api/issues', method: 'POST' })
@@ -31,7 +33,7 @@ describe('project_kickoff', () => {
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     const r = await projectKickoff({
       projectPath: dir, slug: 'kickoff-test',

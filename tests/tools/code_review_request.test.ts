@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { codeReviewRequest } from '../../src/tools/code_review_request.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('code_review_request', () => {
   let agent: MockAgent;
@@ -15,7 +16,7 @@ describe('code_review_request', () => {
   afterEach(async () => { await agent.close(); });
 
   it('refuses self-review (reviewer == implementer)', async () => {
-    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
     await expect(codeReviewRequest({
       implementerAgentId: 'agent-A',
       reviewerAgentId: 'agent-A',
@@ -27,11 +28,12 @@ describe('code_review_request', () => {
 
   it('creates issue assigned to reviewer with label code-review', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, {
       id: 'cr_1', title: 'Code Review: abc1234', labels: ['code-review'],
     });
 
-    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
     const r = await codeReviewRequest({
       implementerAgentId: 'agent-A',
       reviewerAgentId: 'agent-B',

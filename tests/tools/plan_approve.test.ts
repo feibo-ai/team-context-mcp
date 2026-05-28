@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { planApprove } from '../../src/tools/plan_approve.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('plan_approve', () => {
   let agent: MockAgent;
@@ -24,6 +25,7 @@ describe('plan_approve', () => {
 
   it('adds approved label and updates plan Review section', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool
       .intercept({ path: '/api/issues/issue_p1/labels', method: 'POST' })
       .reply(201, {});
@@ -49,7 +51,7 @@ describe('plan_approve', () => {
       serverUrl: 'http://m.test',
       token: 't',
       workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     await planApprove(
       {

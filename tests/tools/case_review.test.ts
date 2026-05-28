@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { caseReview } from '../../src/tools/case_review.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 const TRIVIAL = `### Judgment: x\n- short\n`;
 const SUBSTANTIVE = `### Judgment: cache strategy
@@ -34,7 +35,7 @@ describe('case_review', () => {
   it('refuses if section 4 is trivially short', async () => {
     const casePath = join(dir, 'case.md');
     await writeFile(casePath, `# Case\n\n## 4. Key judgments\n${TRIVIAL}\n\n## 5. General rule candidates\n`);
-    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
     await expect(caseReview({
       casePath, multicaIssueId: 'i1', reviewerEmail: 'a@b',
     }, { client })).rejects.toThrow(/section 4.*too short/i);
@@ -42,11 +43,12 @@ describe('case_review', () => {
 
   it('signs section 4 and adds debrief-reviewed label', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues/i1/labels', method: 'POST' }).reply(201, {});
 
     const casePath = join(dir, 'case.md');
     await writeFile(casePath, `# Case\n\n## 4. Key judgments\n${SUBSTANTIVE}\n\n## 5. General rule candidates\n`);
-    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
 
     const r = await caseReview({
       casePath, multicaIssueId: 'i1', reviewerEmail: 'dri@aimiq',

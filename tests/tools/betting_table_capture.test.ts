@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { bettingTableCapture } from '../../src/tools/betting_table_capture.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('betting_table_capture', () => {
   let agent: MockAgent;
@@ -16,12 +17,13 @@ describe('betting_table_capture', () => {
 
   it('creates issue with proposals + label betting-table', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues', method: 'POST' })
       .reply(201, { id: 'bt_1', labels: ['betting-table'] });
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     const r = await bettingTableCapture({
       action: 'open',

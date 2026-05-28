@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { planUpgrade } from '../../src/tools/plan_upgrade.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('plan_upgrade', () => {
   let dir: string;
@@ -24,6 +25,7 @@ describe('plan_upgrade', () => {
 
   it('bumps version, snapshots history, re-labels for review', async () => {
     const pool = agent.get('http://m.test');
+    interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues/issue_p1/labels', method: 'POST' }).reply(201, {}).times(2);
 
     const planPath = join(dir, 'plan_x.md');
@@ -34,7 +36,7 @@ describe('plan_upgrade', () => {
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
 
     const r = await planUpgrade({
       planPath, multicaIssueId: 'issue_p1',

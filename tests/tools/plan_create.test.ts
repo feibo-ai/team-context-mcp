@@ -6,6 +6,7 @@ import simpleGit from 'simple-git';
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { planCreate } from '../../src/tools/plan_create.js';
 import { MulticaClient } from '../../src/lib/multica.js';
+import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../helpers/multica-mock.js';
 
 describe('plan_create', () => {
   let dir: string;
@@ -21,15 +22,14 @@ describe('plan_create', () => {
     agent = new MockAgent();
     agent.disableNetConnect();
     setGlobalDispatcher(agent);
-    agent
-      .get('http://m.test')
-      .intercept({ path: '/api/issues', method: 'POST' })
-      .reply(201, {
-        id: 'issue_p1',
-        title: 'Plan: feed-latency',
-        status: 'open',
-        labels: ['plan-draft'],
-      });
+    const pool = agent.get('http://m.test');
+    pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, {
+      id: 'issue_p1',
+      title: 'Plan: feed-latency',
+      status: 'open',
+      labels: ['plan-draft'],
+    });
+    interceptAnyLabelAdd(pool);
   });
 
   afterEach(async () => {
@@ -42,7 +42,7 @@ describe('plan_create', () => {
       serverUrl: 'http://m.test',
       token: 't',
       workspaceId: 'w',
-    });
+    labelMap: STANDARD_LABEL_MAP });
     const result = await planCreate(
       {
         projectPath: dir,
