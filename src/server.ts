@@ -95,7 +95,8 @@ async function main() {
   await server.connect(transport);
 }
 
-// Minimal zod → JSON Schema (good enough for object schemas we use)
+// Minimal zod → JSON Schema (covers the schemas we use, incl. ZodDiscriminatedUnion
+// for betting_table_capture + burnout_check_distribute so MCP clients get oneOf hints).
 function zodToJsonSchema(s: z.ZodTypeAny): unknown {
   if (s instanceof z.ZodObject) {
     const shape = (s as any).shape as Record<string, z.ZodTypeAny>;
@@ -112,6 +113,24 @@ function zodToJsonSchema(s: z.ZodTypeAny): unknown {
   if (s instanceof z.ZodNumber) return { type: 'number' };
   if (s instanceof z.ZodArray) return { type: 'array', items: zodToJsonSchema((s as any)._def.type) };
   if (s instanceof z.ZodEnum) return { type: 'string', enum: (s as any)._def.values };
+  if (s instanceof z.ZodLiteral) return { const: (s as any)._def.value };
+  if (s instanceof z.ZodDiscriminatedUnion) {
+    // .options can be a Map (newer zod) or an Array (older zod) — handle both
+    const opts = (s as any).options;
+    const arr: z.ZodTypeAny[] = opts instanceof Map ? Array.from(opts.values()) : opts;
+    return { oneOf: arr.map((o) => zodToJsonSchema(o)) };
+  }
+  if (s instanceof z.ZodUnion) {
+    const opts = (s as any)._def.options as z.ZodTypeAny[];
+    return { oneOf: opts.map((o) => zodToJsonSchema(o)) };
+  }
+  if (s instanceof z.ZodRecord) {
+    return { type: 'object', additionalProperties: zodToJsonSchema((s as any)._def.valueType) };
+  }
+  if (s instanceof z.ZodEffects) {
+    // .refine() / .transform() wraps an inner schema — unwrap it
+    return zodToJsonSchema((s as any)._def.schema);
+  }
   if (s instanceof z.ZodDefault) return zodToJsonSchema((s as any)._def.innerType);
   if (s instanceof z.ZodOptional) return zodToJsonSchema((s as any)._def.innerType);
   return {};

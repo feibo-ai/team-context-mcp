@@ -39,4 +39,4 @@ codex mcp add team-context-mcp -- node /Users/<you>/team-context-mcp/dist/server
 ## Verify
 
 In a fresh Claude/Codex session: ask "What tools do you have?"
-Expected: 8 tools listed.
+Expected: **17 tools** listed (gate 6 + sync 4 + observe 2 + safety 5 · see [README.md](./README.md) for breakdown).

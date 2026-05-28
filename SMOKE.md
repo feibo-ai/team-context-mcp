@@ -60,7 +60,7 @@ Result: 2/2 PASS.
 
 ```
 Test Files  23 passed (23)
-Tests       43 passed (43)
+Tests       45 passed (45)
 ```
 
 `tsc --noEmit` clean. `pnpm build` produces `dist/server.js`.
