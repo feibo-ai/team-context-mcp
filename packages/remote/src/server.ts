@@ -83,12 +83,25 @@ export interface ServerOptions {
   healthHandler?: express.RequestHandler;
 }
 
-export async function startServer(opts: ServerOptions): Promise<Server> {
-  const server = new Server(
-    { name: 'team-context-mcp-remote', version: '0.2.0' },
-    { capabilities: { tools: {} } },
-  );
+/**
+ * Result of `startServer`. `server` is always present (the stdio Server, or a
+ * representative Server for the http path — kept for backward-compat with the
+ * old single-instance shape). `httpServer` is set in http mode so callers can
+ * close it (tests use this for teardown). `transports` is the live per-session
+ * map in http mode · exposed for test inspection.
+ */
+export interface ServerHandle {
+  server: Server;
+  httpServer?: http.Server;
+  transports?: Map<string, StreamableHTTPServerTransport>;
+}
 
+/**
+ * Register tools/list + tools/call handlers on a Server instance. Hoisted out
+ * of the inline so each per-session http Server gets the same handlers as the
+ * stdio Server. Closes over `opts` (tools + deps).
+ */
+function registerHandlers(server: Server, opts: ServerOptions): void {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: opts.tools.map((t) => ({
       name: t.name,
@@ -106,6 +119,17 @@ export async function startServer(opts: ServerOptions): Promise<Server> {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
   });
+}
+
+export async function startServer(opts: ServerOptions): Promise<ServerHandle> {
+  // Top-level Server · used directly by stdio mode, and returned for backward
+  // compat with the old `Promise<Server>` shape via `handle.server`. In http
+  // mode each session gets its own Server (see below).
+  const server = new Server(
+    { name: 'team-context-mcp-remote', version: '0.2.0' },
+    { capabilities: { tools: {} } },
+  );
+  registerHandlers(server, opts);
 
   if (opts.transport === 'http') {
     const app = express();
@@ -113,32 +137,96 @@ export async function startServer(opts: ServerOptions): Promise<Server> {
     if (opts.healthHandler) app.get('/health', opts.healthHandler);
     if (opts.authMiddleware) app.use('/mcp', opts.authMiddleware);
 
-    const transport = new StreamableHTTPServerTransport({
-      // Stateless mode: one transport per process, sessionId is ignored.
-      // Switch to session mode (returning unique IDs) only if per-client
-      // state across requests becomes a requirement.
-      sessionIdGenerator: () => randomUUID(),
-    });
-    await server.connect(transport);
+    // Per-session transport mounting (P1 Bug B fix). The first `initialize`
+    // without a session-id header creates a new {Server, transport} pair;
+    // subsequent requests route by `mcp-session-id` header. The single-
+    // transport-per-process pattern (which we had) locks to the first
+    // client because sessionIdGenerator is set — second initialize sees
+    // "already initialized" until server restart, blocking concurrent MCP
+    // clients (multiple team-member laptops on the same tcmcp-remote).
+    const transports = new Map<string, StreamableHTTPServerTransport>();
 
-    // MCP endpoint — express delegates body parsing + HTTP I/O.
-    app.post('/mcp', async (req, res) => {
-      await transport.handleRequest(req, res, req.body);
-    });
-    // SSE GET (some clients use long-poll fallback)
-    app.get('/mcp', async (req, res) => {
-      await transport.handleRequest(req, res);
-    });
+    const handleMcp = async (
+      req: express.Request,
+      res: express.Response,
+    ): Promise<void> => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      let transport: StreamableHTTPServerTransport | undefined;
+
+      if (sessionId && transports.has(sessionId)) {
+        transport = transports.get(sessionId);
+      } else if (
+        !sessionId &&
+        req.method === 'POST' &&
+        (req.body as { method?: string } | undefined)?.method === 'initialize'
+      ) {
+        // New session: spin up a fresh Server (so each session has its own
+        // request handlers; cheap because they're closures over `opts`).
+        const sessionServer = new Server(
+          { name: 'team-context-mcp-remote', version: '0.2.0' },
+          { capabilities: { tools: {} } },
+        );
+        registerHandlers(sessionServer, opts);
+
+        const sessionTransport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (sid: string) => {
+            transports.set(sid, sessionTransport);
+          },
+        });
+        sessionTransport.onclose = (): void => {
+          if (sessionTransport.sessionId)
+            transports.delete(sessionTransport.sessionId);
+        };
+        await sessionServer.connect(sessionTransport);
+        transport = sessionTransport;
+      } else {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32600,
+            message:
+              'Invalid: missing or unknown session-id (send `initialize` without a session-id header to create one)',
+          },
+          id: null,
+        });
+        return;
+      }
+
+      if (!transport) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'no transport' },
+          id: null,
+        });
+        return;
+      }
+
+      await transport.handleRequest(
+        req,
+        res,
+        req.method === 'POST' ? req.body : undefined,
+      );
+    };
+
+    app.post('/mcp', handleMcp);
+    app.get('/mcp', handleMcp);
+    app.delete('/mcp', handleMcp); // SDK uses DELETE for session cleanup
 
     const httpServer = http.createServer(app);
-    httpServer.listen(opts.port ?? 8443, () => {
-      process.stderr.write(`tcmcp-remote listening on :${opts.port ?? 8443}\n`);
+    await new Promise<void>((resolve) => {
+      httpServer.listen(opts.port ?? 8443, () => {
+        process.stderr.write(
+          `tcmcp-remote listening on :${opts.port ?? 8443}\n`,
+        );
+        resolve();
+      });
     });
-  } else {
-    await server.connect(new StdioServerTransport());
+    return { server, httpServer, transports };
   }
 
-  return server;
+  await server.connect(new StdioServerTransport());
+  return { server };
 }
 
 /**
@@ -252,12 +340,20 @@ export function buildToolDefs(): ToolDef[] {
 /**
  * Same zod → JSON Schema strategy as the old root src/server.ts. The shared
  * `zod-to-json-schema` package would also work, but a hand-rolled walker
- * keeps the output stable and avoids drift in MCP client tooling.
+ * keeps the output stable and avoids drift in MCP client tooling. Exported
+ * so tests can verify Bug A (type:'object' enforced at root) without
+ * spinning up an HTTP server.
  */
-function zodToJsonSchema(s: z.ZodTypeAny): unknown {
-  const z = (s.constructor as { name: string }).name; // for fallback
-  void z;
-  return walk(s);
+export function zodToJsonSchema(s: z.ZodTypeAny): unknown {
+  const out = walk(s) as Record<string, unknown>;
+  // MCP spec requires inputSchema.type === 'object' at the root. Tools that
+  // use z.union / z.discriminatedUnion / .refine() at the top level produce
+  // { oneOf: [...] } / { anyOf: [...] } via `walk` without a top-level type,
+  // which strict MCP SDK clients reject (Codex was lenient · Plan 5 P1
+  // Bug A). The oneOf/anyOf branches themselves are object schemas so
+  // forcing type:'object' here is JSON-Schema-valid.
+  if (!out.type) out.type = 'object';
+  return out;
 }
 
 function walk(s: z.ZodTypeAny): unknown {
