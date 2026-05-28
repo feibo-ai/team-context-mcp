@@ -1,14 +1,36 @@
 # syntax=docker/dockerfile:1.7
 #
-# @tcmcp/remote — multi-stage build for local debug (Plan 5 M-21).
+# @tcmcp/remote — multi-stage build · v0.3 (cloud edition · Zeabur DRI ops bundle)
 #
-# Stage 1 (builder): pnpm install workspace, build the 4 packages we need.
-# Stage 2 (runtime): copy only built dist/ + production node_modules.
+# Stage 0 (multica-builder): Go build tc-multica's `multica` CLI from main.
+# Stage 1 (builder):         pnpm install workspace, build the 4 packages.
+# Stage 2 (runtime):         dist + multica binary + team-context scripts/skills/autopilots.
 #
-# ENTRYPOINT runs packages/remote/dist/server.js (HTTP/SSE transport).
+# ENTRYPOINT runs packages/remote/dist/server.js (HTTP/SSE transport · normal request path).
+#
+# DRI ops (zero-CLI on user mac · all flow through Zeabur exec):
+#   zeabur service exec --id <tcmcp-remote> -- multica autopilot list
+#   zeabur service exec --id <tcmcp-remote> -- bash /opt/team-context/scripts/apply-autopilots.sh
+#   zeabur service exec --id <tcmcp-remote> -- bash             # interactive shell
+#
+# To refresh team-context (skills / autopilots / scripts) without rebuild:
+#   zeabur service exec --id <tcmcp-remote> -- git -C /opt/team-context pull
 
 # -----------------------------------------------------------------------------
-# Stage 1 · builder
+# Stage 0 · multica CLI build (clones tc-multica @ main · GOPROXY for CN mirror)
+# -----------------------------------------------------------------------------
+FROM golang:1.26-alpine AS multica-builder
+RUN apk add --no-cache git ca-certificates
+ENV GOPROXY=https://goproxy.cn,direct
+WORKDIR /src
+ARG MULTICA_REPO=https://github.com/feibo-ai/tc-multica.git
+ARG MULTICA_REF=main
+RUN git clone --depth 1 --branch ${MULTICA_REF} ${MULTICA_REPO}
+RUN cd tc-multica/server && \
+    CGO_ENABLED=0 go build -ldflags "-s -w" -o /multica ./cmd/multica
+
+# -----------------------------------------------------------------------------
+# Stage 1 · builder (unchanged from v0.2)
 # -----------------------------------------------------------------------------
 # Node 22 because pnpm 11.x uses `node:sqlite` (added in 22.5).  package.json
 # `engines.node` is ">=20"; 22 is in range.  Runtime can stay on the same
@@ -53,10 +75,21 @@ RUN CI=true pnpm install --frozen-lockfile --prod \
 # -----------------------------------------------------------------------------
 FROM node:22-alpine AS runtime
 
-# wget is used by the docker-compose healthcheck against /health.
-RUN apk add --no-cache wget tini
+# Plan-5 base (wget + tini) · plus DRI-ops bundle (bash + curl + jq + git for scripts).
+RUN apk add --no-cache wget tini bash curl jq git ca-certificates
 
 WORKDIR /app
+
+# multica CLI binary · DRI ops via `zeabur service exec -- multica …`
+COPY --from=multica-builder /multica /usr/local/bin/multica
+RUN chmod 0755 /usr/local/bin/multica
+
+# team-context bootstrap scripts + skills/autopilots/standards (public repo @ main · build-time clone).
+# Refresh on demand: `zeabur service exec -- git -C /opt/team-context pull`.
+ARG TEAM_CONTEXT_REPO=https://github.com/feibo-ai/team-context.git
+ARG TEAM_CONTEXT_REF=main
+RUN git clone --depth 1 --branch ${TEAM_CONTEXT_REF} ${TEAM_CONTEXT_REPO} /opt/team-context \
+ && chown -R node:node /opt/team-context
 
 # Copy manifests (needed at runtime for `node` to resolve workspace packages
 # through node_modules symlinks that pnpm creates).
@@ -85,6 +118,9 @@ ENV NODE_ENV=production \
     MCP_HTTP_PORT=8443
 
 EXPOSE 8443
+
+# Writable home for `multica login` / `multica config` state when DRI execs in.
+RUN mkdir -p /home/node/.multica && chown -R node:node /home/node/.multica
 
 # Non-root for defence in depth · `node` user ships with the base image.
 USER node
