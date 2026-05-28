@@ -64,4 +64,50 @@ describe('case_create', () => {
     expect(content).toContain('## 4. Key judgments');
     expect(content).toContain('## 5. General rule candidates');
   });
+
+  it('refuses to overwrite an existing case file', async () => {
+    agent
+      .get('http://m.test')
+      .intercept({ path: '/api/issues', method: 'POST' })
+      .reply(201, { id: 'c1', title: 'Debrief', status: 'open', labels: ['debrief'] })
+      .persist(); // allow first call's createIssue; second call shouldn't reach this
+
+    const client = new MulticaClient({
+      serverUrl: 'http://m.test',
+      token: 't',
+      workspaceId: 'w',
+    });
+
+    const args = {
+      projectPath: dir,
+      slug: 'feed-latency',
+      goal: 'Reduce p99 to <400ms',
+      whatHappened: 'first run',
+      criteriaResults: [{ criterion: 'p99 <400ms 24h', met: true }],
+      keyJudgments: [{
+        title: 'Cache key',
+        context: 'collisions',
+        options: ['A', 'B'],
+        chose: 'A',
+        inHindsight: 'right call',
+        ancientImpossible: 'No',
+      }],
+      ruleCandidates: [],
+    };
+
+    // First call writes the case file.
+    const first = await caseCreate(args, { client });
+    const firstContent = await readFile(first.casePath, 'utf-8');
+    expect(firstContent).toContain('first run');
+
+    // Second call with identical slug + same day → should throw, not silently overwrite.
+    await expect(
+      caseCreate({ ...args, whatHappened: 'second run — should NOT overwrite' }, { client })
+    ).rejects.toThrow(/already exists/);
+
+    // File on disk must still be the first version (no silent overwrite).
+    const after = await readFile(first.casePath, 'utf-8');
+    expect(after).toContain('first run');
+    expect(after).not.toContain('second run');
+  });
 });

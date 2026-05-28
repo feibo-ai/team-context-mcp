@@ -46,4 +46,31 @@ describe('research_create', () => {
     expect(content).toContain('## Open questions');
     expect(content).toContain('## Recommended approaches');
   });
+
+  it('returns alreadyExisted=true on second call without rewriting the file', async () => {
+    const pool = agent.get('http://m.test');
+    // Both calls hit /api/issues — research_create always logs the issue, even on re-entry.
+    pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_a', labels: ['research'] }).persist();
+
+    const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w' });
+    const args = {
+      projectPath: dir,
+      slug: 'cache-strategy',
+      question: 'How should we restructure cache keys to handle hot keys at scale?',
+    };
+
+    const first = await researchCreate(args, { client });
+    expect(first.alreadyExisted).toBe(false);
+
+    // Mutate the file so we can prove the second call doesn't rewrite it.
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(first.researchPath, '# tampered — should survive idempotent re-call\n', 'utf-8');
+
+    const second = await researchCreate(args, { client });
+    expect(second.alreadyExisted).toBe(true);
+    expect(second.researchPath).toBe(first.researchPath);
+
+    const preserved = await readFile(first.researchPath, 'utf-8');
+    expect(preserved).toBe('# tampered — should survive idempotent re-call\n');
+  });
 });
