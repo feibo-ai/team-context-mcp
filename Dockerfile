@@ -84,6 +84,17 @@ WORKDIR /app
 COPY --from=multica-builder /multica /usr/local/bin/multica
 RUN chmod 0755 /usr/local/bin/multica
 
+# feishu-cli (deprecated since W5 · kept for DRI debug per user request)
+# Source: github.com/riba2534/feishu-cli  ·  https://github.com/riba2534/feishu-cli/releases
+ARG FEISHU_CLI_VERSION=v1.29.0
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
+ && curl -fsSL "https://github.com/riba2534/feishu-cli/releases/download/${FEISHU_CLI_VERSION}/feishu-cli_${FEISHU_CLI_VERSION}_linux-${ARCH}.tar.gz" \
+      -o /tmp/feishu-cli.tar.gz \
+ && tar -xzf /tmp/feishu-cli.tar.gz -C /tmp \
+ && mv /tmp/feishu-cli /usr/local/bin/feishu-cli \
+ && chmod 0755 /usr/local/bin/feishu-cli \
+ && rm -f /tmp/feishu-cli.tar.gz
+
 # team-context bootstrap scripts + skills/autopilots/standards (public repo @ main · build-time clone).
 # Refresh on demand: `zeabur service exec -- git -C /opt/team-context pull`.
 ARG TEAM_CONTEXT_REPO=https://github.com/feibo-ai/team-context.git
