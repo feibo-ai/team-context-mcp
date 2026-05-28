@@ -40,7 +40,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 }
 ```
 
-Replace `<your-multica-token>` and `<you>` with your values. The remote URL and the local path are independent — failing to reach the remote server only disables the 10 Feishu/SOP-broadcast tools; the 12 local tools still work.
+Replace `<your-multica-token>` and `<you>` with your values. The remote URL and the local path are independent — failing to reach the remote server only disables the 10 Feishu/SOP-broadcast tools (you'll see them missing from `tools/list`); the 12 local git/file tools still work.
 
 ### 3. Wire into Codex CLI (optional)
 
@@ -147,20 +147,34 @@ docker compose up -d
 curl http://localhost:8443/health
 ```
 
-Expected `/health` JSON:
+Expected `/health` JSON (real shape — fields match `HealthResponse` in `packages/remote/src/health.ts`):
 
 ```json
 {
-  "ok": true,
-  "controlPlaneOk": true,
-  "configVersion": 1,
-  "multica": "ok",
-  "feishu": "ok",
-  "gitSha": "abc1234"
+  "status": "healthy",
+  "version": "abc1234",
+  "uptime_seconds": 42.7,
+  "config_version": 1,
+  "config_source": "MulticaConfigSource",
+  "multica_control_plane_enabled": true,
+  "multica_reachable": true,
+  "feishu_ready": true,
+  "deployment": {
+    "registered": true,
+    "deployment_id": "dep_xxx",
+    "beats_succeeded": 3,
+    "beats_failed": 0
+  }
 }
 ```
 
-If `controlPlaneOk` is `false`: revisit the Pre-flight section. If `feishu` is `"error"`:
+Field semantics:
+- `status` rolls up to `"degraded"` iff `multica_reachable` is `false`. Feishu unready does NOT degrade (it's a downstream side-effect, not a request-path dep).
+- `config_source` is `"MulticaConfigSource"` when control plane is wired, `"EnvConfigSource"` when falling back, `"LayeredConfigSource"` when both stacked.
+- `multica_control_plane_enabled` is set after `MulticaConfigSource.start()` resolves; `false` means first pull threw 404 (server-side `MULTICA_CONTROL_PLANE_ENABLED=false` or integration row missing).
+- `deployment` block appears only when the integration is resolved and `DeploymentTracker` is wired; absent means env-only mode.
+
+If `multica_control_plane_enabled` is `false`: revisit the Pre-flight section above. If `feishu_ready` is `false`:
 your service token can't read the secret — see the capability table.
 
 ### 5. Share with the team
@@ -180,8 +194,12 @@ multica issue create \
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| `tcmcp-remote` 401 on every call | Bearer not validated against `/api/me` | Re-issue your multica token; check `/health` reports `controlPlaneOk=true` |
-| `feishu: error` in `/health` | Service token not admin → can't read `FEISHU_APP_SECRET` | Switch `MULTICA_SERVICE_TOKEN` to an admin/owner user |
-| `controlPlaneOk=false` in `/health` | `MULTICA_CONTROL_PLANE_ENABLED=false` on server, or integration not found | Enable on multica `.env` and create integration; see Pre-flight |
+| `tcmcp-remote` 401 on every call | Bearer not validated against `/api/me` | Re-issue your multica token; check `/health` reports `multica_control_plane_enabled: true` |
+| `feishu_ready: false` in `/health` | Service token not admin → can't read `FEISHU_APP_SECRET` | Switch `MULTICA_SERVICE_TOKEN` to an admin/owner user |
+| `multica_control_plane_enabled: false` in `/health` | `MULTICA_CONTROL_PLANE_ENABLED=false` on server, or integration not found | Enable on multica `.env` and create integration; see Pre-flight |
+| `config_source: "EnvConfigSource"` in `/health` | Control plane pull failed → fell back to env-only | Check container logs for the throw from `MulticaConfigSource.start()`; fix and `docker compose restart` |
+| `deployment` block missing in `/health` | Integration not resolved → `DeploymentTracker` not wired | Same as above; resolve control plane connectivity first |
+| `multica_reachable: false` | Network / DNS / auth | `curl -H "Authorization: Bearer $TOKEN" $MULTICA_URL/api/me` from inside the container |
+| `beats_failed` keeps growing | Heartbeat POSTs failing (auth or network) | Check container logs for `heartbeat failed: ...` lines |
 | Local tools missing in client | Wrong path to `packages/local/dist/server.js` | Run `pnpm --filter '@tcmcp/local' build` then check the absolute path |
-| Rotation not picked up | WS disconnected — check container logs for `MulticaConfigSource` backoff | Auto-recovers via exponential backoff; if stuck > 1 min, `docker compose restart tcmcp-remote` |
+| Rotation not picked up | WS disconnected — check container logs for `MulticaConfigSource` backoff | Auto-recovers via exponential backoff (5s → 60s cap); if stuck > 1 min, `docker compose restart tcmcp-remote` |
