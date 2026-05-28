@@ -1,25 +1,8 @@
 // packages/feishu/src/client.ts
+import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import * as lark from '@larksuiteoapi/node-sdk';
-
-// NOTE: Local placeholder for `ConfigSource` (mirrors @tcmcp/config/src/source.ts).
-// `@tcmcp/config` resolves to `dist/index.d.ts` via its exports map, which is not
-// built in this monorepo yet (no dist). Swap this to `import type { ConfigSource }
-// from '@tcmcp/config';` once M-3+ produces a dist or the workspace tsconfig is
-// rewired to resolve to source.
-export interface ConfigSource {
-  /** Get a non-secret config value. Returns undefined if not set. */
-  get<T = unknown>(key: string): T | undefined;
-  /** Get a secret value. Async because may hit network. Cached internally. */
-  getSecret(key: string): Promise<string | undefined>;
-  /** Get current config version (for sanity check). */
-  version(): number;
-  /** Subscribe to config changes. Returns unsubscribe fn. */
-  onChange(callback: (changedKey: string) => void): () => void;
-  /** Start any background work (poll/WS). */
-  start?(): Promise<void>;
-  /** Cleanup. */
-  stop?(): Promise<void>;
-}
+import type { ConfigSource } from '@tcmcp/config';
 
 export class FeishuClient {
   private sdk?: lark.Client;
@@ -129,20 +112,111 @@ export class FeishuClient {
 
   /**
    * Markdown -> feishu docx via the real 4-step drive importTask flow.
-   * Real method names (verified against @larksuiteoapi/node-sdk):
-   *   - drive.file.uploadAll (or upload_all chunked) -> file_token
-   *   - drive.importTask.create({ file_token, type:'md', point:{type:'docx',...} }) -> ticket
+   * Real method names (verified against @larksuiteoapi/node-sdk v1.66):
+   *   - drive.media.uploadAll (parent_type:'ccm_import_open') -> file_token
+   *   - drive.importTask.create({ file_token, file_extension:'md', type:'docx', point:{mount_type:1, mount_key:''} }) -> ticket
    *   - poll drive.importTask.get({ ticket }) until result.job_status === 0 (success)
-   *   - result returns token = the new docx's document_id; build URL via known prefix
-   * The full code is ~40 lines; this stub leaves a clearly marked TODO so M-8
-   * implementers don't ship a silent placeholder.
+   *   - result.token = the new docx's document_id; URL = https://feishu.cn/docx/<token>
+   *
+   * Deviation from plan: the plan suggested `drive.file.uploadAll` with
+   * `parent_type:'explorer'`. Per Feishu's official "import user guide", the
+   * importTask flow requires `drive.media.uploadAll` with
+   * `parent_type:'ccm_import_open'` — the upload is staged for import
+   * processing, not placed into the user's space. Using `file.uploadAll` here
+   * returns an error like "file_token does not support import".
+   *
+   * `point.mount_type:1, mount_key:''` mounts the new docx at the bot's
+   * "my space" root. The downstream `wikiNodeCreate` then attaches the docx
+   * token to the target wiki space, so we deliberately do NOT mount into wiki
+   * at import time (mount_type 1 is the only safely-supported value across
+   * tenant configurations).
+   *
+   * Polling: 1s interval, 30 attempts max (≈30s) — drive.importTask job_status
+   * codes: 0=success, 1=initializing, 2=processing, anything else = failure.
    */
   async docImportMarkdown(p: { markdownPath: string; title: string }): Promise<{ docId: string; url: string }> {
     const sdk = await this.ensureSdk();
-    void sdk; void p;
-    throw new Error(
-      'docImportMarkdown not yet implemented · see M-8 step note about drive.importTask + polling',
-    );
+
+    // 1. Read markdown bytes and upload as staged import media.
+    let fileToken: string | undefined;
+    try {
+      const bytes = await readFile(p.markdownPath);
+      // Feishu requires `.md` file_name suffix; derive from path so the extension
+      // matches the importTask `file_extension:'md'` declaration.
+      const rawName = basename(p.markdownPath);
+      const fileName = rawName.toLowerCase().endsWith('.md') ? rawName : `${rawName.replace(/\.[^.]*$/, '')}.md`;
+      const upload = await sdk.drive.media.uploadAll({
+        data: {
+          file_name: fileName,
+          parent_type: 'ccm_import_open',
+          parent_node: '',
+          size: bytes.length,
+          file: bytes,
+        },
+      });
+      // SDK quirk: media.uploadAll returns the unwrapped data object directly
+      // (not the {code,msg,data:{...}} envelope), so the file_token is at the top.
+      fileToken = upload?.file_token;
+      if (!fileToken) {
+        throw new Error('upload returned no file_token');
+      }
+    } catch (e) {
+      throw new Error(`docImportMarkdown · upload failed for "${p.title}": ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // 2. Create the import task.
+    let ticket: string | undefined;
+    try {
+      const created = await sdk.drive.importTask.create({
+        data: {
+          file_extension: 'md',
+          file_token: fileToken,
+          type: 'docx',
+          file_name: p.title,
+          point: {
+            mount_type: 1, // "my space"
+            mount_key: '',
+          },
+        },
+      });
+      ticket = created?.data?.ticket;
+      if (!ticket) {
+        throw new Error(`importTask.create returned no ticket (code=${created?.code ?? '?'} msg=${created?.msg ?? ''})`);
+      }
+    } catch (e) {
+      throw new Error(`docImportMarkdown · importTask.create failed for "${p.title}": ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // 3. Poll importTask.get until job_status === 0 (success) or failure.
+    const maxAttempts = 30;
+    const intervalMs = 1000;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      let polled: Awaited<ReturnType<typeof sdk.drive.importTask.get>>;
+      try {
+        polled = await sdk.drive.importTask.get({ path: { ticket } });
+      } catch (e) {
+        throw new Error(`docImportMarkdown · importTask.get failed · ticket=${ticket}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      const result = polled?.data?.result;
+      const status = result?.job_status;
+      if (status === 0) {
+        // 4. Success — extract docx token + build URL.
+        const token = result?.token;
+        if (!token) {
+          throw new Error(`docImportMarkdown · ticket=${ticket} reported success but result.token missing`);
+        }
+        return { docId: token, url: `https://feishu.cn/docx/${token}` };
+      }
+      if (status === undefined || status === 1 || status === 2) {
+        continue; // still initializing / processing
+      }
+      // Any other status = failure.
+      throw new Error(
+        `docImportMarkdown · ticket=${ticket} failed · job_status=${status} · ${result?.job_error_msg ?? '(no error message)'}`,
+      );
+    }
+    throw new Error(`docImportMarkdown · timed out after ${maxAttempts * intervalMs}ms · ticket=${ticket}`);
   }
 
   /**
