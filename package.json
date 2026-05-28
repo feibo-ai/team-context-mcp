@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@tcmcp/feishu": "workspace:*",
     "@tcmcp/shared": "workspace:*",
     "gray-matter": "^4.0.3",
     "simple-git": "^3.27.0",

@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
+import type { FeishuClient } from '@tcmcp/feishu';
 import type { MulticaClient } from '../lib/multica.js';
 
 const responseSchema = z.object({
@@ -36,33 +36,6 @@ const QUESTIONS = [
   'q3: 下班后还在想 Claude session 状态吗？',
 ];
 
-/** Send burnout check P2P via feishu-cli msg send (one DM per team member). */
-function feishuSendP2P(email: string, text: string): void {
-  execFileSync('feishu-cli', [
-    'msg', 'send',
-    '--receive-id-type', 'email',
-    '--receive-id', email,
-    '--text', text,
-  ], { stdio: 'pipe' });
-}
-
-/** Read P2P chat history with a single member via feishu-cli. Returns parsed messages JSON. */
-function feishuReadP2P(email: string, sinceISO: string): Array<{ content: string }> {
-  const out = execFileSync('feishu-cli', [
-    'msg', 'history',
-    '--user-email', email,
-    '--since', sinceISO,
-    '--limit', '50',
-    '--output', 'json',
-  ]).toString();
-  try {
-    const parsed = JSON.parse(out);
-    return Array.isArray(parsed?.items) ? parsed.items : [];
-  } catch {
-    return [];
-  }
-}
-
 /** Extract q1/q2/q3 yes-no from member's reply messages. Drop sender — anonymize. */
 function parseResponse(messages: Array<{ content: string }>): z.infer<typeof responseSchema> | null {
   const text = messages.map((m) => m.content || '').join('\n').toLowerCase();
@@ -77,7 +50,7 @@ function parseResponse(messages: Array<{ content: string }>): z.infer<typeof res
 
 export async function burnoutCheckDistribute(
   raw: z.infer<typeof burnoutCheckDistributeInput>,
-  deps: { client: MulticaClient }
+  deps: { client: MulticaClient; feishu: FeishuClient }
 ): Promise<any> {
   const input = burnoutCheckDistributeInput.parse(raw);
 
@@ -99,7 +72,7 @@ export async function burnoutCheckDistribute(
     const failed: string[] = [];
     for (const email of input.teamEmails) {
       try {
-        feishuSendP2P(email, msg);
+        await deps.feishu.dmSendByEmail({ email, text: msg });
         sent++;
       } catch {
         failed.push(email);
@@ -117,14 +90,15 @@ export async function burnoutCheckDistribute(
     }
 
     // Path A: caller supplied responses (manual / external form). Use as-is.
-    // Path B: caller supplied teamEmails. Auto-scrape via feishu-cli.
+    // Path B: caller supplied teamEmails. Auto-scrape via FeishuClient.msgHistoryP2P.
     let responses: Array<z.infer<typeof responseSchema>> = [];
     if (input.responses && input.responses.length > 0) {
       responses = input.responses;
     } else if (input.teamEmails && input.teamEmails.length > 0) {
       const sinceISO = `${input.month}-01`;
       for (const email of input.teamEmails) {
-        const msgs = feishuReadP2P(email, sinceISO);
+        const msgs = await deps.feishu.msgHistoryP2P({ email, sinceISO, limit: 50 });
+        // parseResponse anonymizes by ignoring `sender` — only `content` is read.
         const parsed = parseResponse(msgs);
         if (parsed) responses.push(parsed);
         // If no parse: member did not reply this month. Drop silently.

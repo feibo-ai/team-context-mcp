@@ -11,6 +11,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.29.0(zod@3.25.76)
+      '@tcmcp/feishu':
+        specifier: workspace:*
+        version: link:packages/feishu
       '@tcmcp/shared':
         specifier: workspace:*
         version: link:packages/shared
