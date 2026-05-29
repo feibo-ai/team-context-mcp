@@ -39,14 +39,14 @@ describe('research_create', () => {
     expect(r.multicaIssueId).toBe('r_1');
 
     const content = await readFile(r.researchPath, 'utf-8');
-    expect(content).toContain('# Research:');
-    expect(content).toContain('## Question');
-    expect(content).toContain('### Existing codebase');
-    expect(content).toContain('### Prior art');
-    expect(content).toContain('### Pitfalls');
-    expect(content).toContain('### Constraints');
-    expect(content).toContain('## Open questions');
-    expect(content).toContain('## Recommended approaches');
+    expect(content).toContain('# 研究:');
+    expect(content).toContain('## 问题');
+    expect(content).toContain('### 现有代码');
+    expect(content).toContain('### 先例');
+    expect(content).toContain('### 陷阱');
+    expect(content).toContain('### 约束');
+    expect(content).toContain('## 待解问题');
+    expect(content).toContain('## 推荐方案');
   });
 
   it('returns alreadyExisted=true on second call without rewriting the file', async () => {

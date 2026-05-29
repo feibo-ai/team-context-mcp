@@ -17,7 +17,7 @@ export async function planApprove(
 ): Promise<{ approvedAt: string }> {
   const input = planApproveInput.parse(raw);
 
-  await deps.client.addLabel(input.multicaIssueId, 'plan-approved');
+  await deps.client.addLabel(input.multicaIssueId, '计划-已批准');
 
   const original = await readFile(input.planPath, 'utf-8');
   const reviewedAt = new Date().toISOString();
@@ -26,7 +26,7 @@ export async function planApprove(
     `- Reviewed: ${reviewedAt}`,
     `- Verdict: approved`,
   ].join('\n');
-  const updated = replaceSection(original, 'Review', newBody);
+  const updated = replaceSection(original, '评审', newBody);
   await writeFile(input.planPath, updated, 'utf-8');
 
   return { approvedAt: reviewedAt };

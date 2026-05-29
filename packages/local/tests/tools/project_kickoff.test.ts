@@ -52,8 +52,8 @@ describe('project_kickoff', () => {
     expect(r.broadcastSuggestion.text).toContain('alice');
 
     const research = await readFile(r.researchPath, 'utf-8');
-    expect(research).toContain('# Research: reduce p99 latency');
-    expect(research).toContain('## Question');
+    expect(research).toContain('# 研究:reduce p99 latency');
+    expect(research).toContain('## 问题');
 
     const plan = await readFile(r.planPath, 'utf-8');
     expect(plan).toContain('cut p99 from 800ms to <400ms');

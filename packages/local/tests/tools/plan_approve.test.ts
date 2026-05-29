@@ -36,10 +36,10 @@ describe('plan_approve', () => {
       [
         '# Plan: x',
         '',
-        '## Goal',
+        '## 目标',
         'do thing',
         '',
-        '## Review',
+        '## 评审',
         '- Reviewer: _(pending)_',
         '- Reviewed: _(pending)_',
         '- Verdict: pending',

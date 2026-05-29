@@ -34,28 +34,28 @@ export async function projectKickoff(
   await mkdir(dirname(researchPath), { recursive: true });
   await mkdir(dirname(planPath), { recursive: true });
 
-  await writeFile(researchPath, `# Research: ${input.topic}
+  await writeFile(researchPath, `# 研究:${input.topic}
 
-## Question
-<one paragraph: what we are trying to understand>
+## 问题
+<一段话:我们想搞清楚什么>
 
-## Findings
-### Existing codebase
+## 发现
+### 现有代码
 - TBD
 
-### Prior art
+### 先例
 - TBD
 
-### Pitfalls
+### 陷阱
 - TBD
 
-### Constraints
+### 约束
 - TBD
 
-## Open questions
+## 待解问题
 - TBD
 
-## Recommended approaches
+## 推荐方案
 1. TBD
 `);
 
@@ -64,40 +64,40 @@ version: 1.0
 layer: project
 dri: ${input.dri}
 ---
-# Plan: ${input.slug}
+# 计划:${input.slug}
 
-**Created:** ${date}
+**创建:** ${date}
 **DRI:** ${input.dri}
-**Layer:** project
+**层级:** project
 
-## Goal
+## 目标
 ${input.goalDraft}
 
-## Completion criteria
-- [ ] TBD (DRI fills in after Research)
+## 完成标准
+- [ ] TBD (DRI 在 Research 后填写)
 
-## How to split
+## 分工
 - DRI: ${input.dri}
 - EXEC: _(invoke role-assignment-protocol skill)_
 - COLLAB: _(invoke role-assignment-protocol skill)_
 - REVIEW: _(assign before Implement phase)_
 
-## Appetite
+## 投入预算
 ${input.appetite}
 
-## Research input
+## 研究输入
 ${researchPath.replace(input.projectPath + '/', '')}
 
-## Approach
-_(fill in after Research session)_
+## 方案
+_(Research 后填写)_
 
-## Review
+## 评审
 - Reviewer: _(pending)_
 - Reviewed: _(pending)_
 - Verdict: pending
 
-## Current State (handoff slot — see pre-clear skill)
-_(empty until first handoff)_
+## 当前状态(交接槽 · 见 pre-clear skill)
+_(首次交接前为空)_
 `);
 
   // Create multica project
@@ -108,9 +108,9 @@ _(empty until first handoff)_
 
   // Create initial issue
   const issue = await deps.client.createIssue({
-    title: `Plan: ${input.slug}`,
+    title: `计划:${input.slug}`,
     body: `Project kickoff via project_kickoff tool.\n\nPlan: \`${planPath}\`\nResearch: \`${researchPath}\``,
-    labels: ['plan-draft'],
+    labels: ['计划-草稿'],
     projectId: project.id,
   });
 

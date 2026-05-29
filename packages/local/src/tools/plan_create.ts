@@ -54,9 +54,9 @@ export async function planCreate(
   }
 
   const issue = await deps.client.createIssue({
-    title: `Plan: ${input.slug}`,
+    title: `计划:${input.slug}`,
     body: `Plan markdown: \`${planPath}\``,
-    labels: ['plan-draft'],
+    labels: ['计划-草稿'],
   });
 
   return { planPath, multicaIssueId: issue.id, alreadyExisted: existed };
@@ -64,14 +64,14 @@ export async function planCreate(
 
 function renderPlanMarkdown(input: PlanCreateInput, date: string): string {
   if (input.layer === 'task') {
-    return `# Plan: ${input.slug}
+    return `# 计划:${input.slug}
 
-**Created:** ${date}
-**Layer:** task
+**创建:** ${date}
+**层级:** task
 
-**What:** ${input.goal}
-**Done when:** ${input.completionCriteria.join('; ')}
-**Boundary:** (out of scope: TBD)
+**做什么:** ${input.goal}
+**完成于:** ${input.completionCriteria.join('; ')}
+**边界:** (暂不包含: TBD)
 `;
   }
 
@@ -81,36 +81,36 @@ function renderPlanMarkdown(input: PlanCreateInput, date: string): string {
   const reviewer = input.reviewer || '_(assign before Implement phase)_';
   const approach = input.approach || '_(fill in)_';
 
-  return `# Plan: ${input.slug}
+  return `# 计划:${input.slug}
 
-**Created:** ${date}
-**DRI:** ${input.dri || '_(assign)_'}
-**Layer:** project
+**创建:** ${date}
+**DRI:** ${input.dri || '_(待指派)_'}
+**层级:** project
 
-## Goal
+## 目标
 ${input.goal}
 
-## Completion criteria
+## 完成标准
 ${criteria}
 
-## How to split
-- DRI: ${input.dri || '_(assign)_'}
+## 分工
+- DRI: ${input.dri || '_(待指派)_'}
 - EXEC: ${exec}
 - COLLAB: ${collab}
 - REVIEW: ${reviewer}
 
-## Appetite
-${input.appetite || '_(set)_'}
+## 投入预算
+${input.appetite || '_(待设定)_'}
 
-## Approach
+## 方案
 ${approach}
 
-## Review
+## 评审
 - Reviewer: _(pending)_
 - Reviewed: _(pending)_
 - Verdict: pending
 
-## Current State (handoff slot — see pre-clear skill)
-_(empty until first handoff)_
+## 当前状态(交接槽 · 见 pre-clear skill)
+_(首次交接前为空)_
 `;
 }

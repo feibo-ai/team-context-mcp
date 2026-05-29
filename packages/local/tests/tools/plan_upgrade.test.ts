@@ -48,7 +48,7 @@ describe('plan_upgrade', () => {
 
     const updated = await readFile(planPath, 'utf-8');
     expect(updated).toMatch(/version: 1\.1/);
-    expect(updated).toContain('## Upgrade Log');
+    expect(updated).toContain('## 升级日志');
     expect(updated).toContain('1.0 → 1.1');
     expect(updated).toContain('realized X was wrong');
 

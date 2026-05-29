@@ -41,7 +41,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'plan_create',
     description:
-      'Create a new plan markdown + multica plan-draft issue. SOP P-3 Phase 01 step 3.',
+      'Create a new plan markdown + multica 计划-草稿 issue. SOP P-3 Phase 01 step 3.',
     schema: planCreateInput,
     handler: (i, d) => planCreate(i as z.infer<typeof planCreateInput>, d),
   },
@@ -97,7 +97,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'research_create',
-    description: 'RPI Research phase skeleton + multica research-labelled issue.',
+    description: 'RPI Research phase skeleton + multica 研究 issue.',
     schema: researchCreateInput,
     handler: (i, d) =>
       researchCreate(i as z.infer<typeof researchCreateInput>, d),

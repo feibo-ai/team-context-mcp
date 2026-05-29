@@ -60,7 +60,7 @@ describe('plan_create', () => {
     expect(result.multicaIssueId).toBe('issue_p1');
 
     const content = await readFile(result.planPath, 'utf-8');
-    expect(content).toContain('## Goal\nReduce p99 to <400ms');
+    expect(content).toContain('## 目标\nReduce p99 to <400ms');
     expect(content).toContain('p99 <400ms over 24h prod');
     expect(content).toContain('**DRI:** alice');
   });
