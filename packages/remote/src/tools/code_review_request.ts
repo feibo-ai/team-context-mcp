@@ -22,28 +22,28 @@ export async function codeReviewRequest(
   }
 
   const body = [
-    `## Code Review Request`,
+    `## 代码评审请求`,
     ``,
-    `**Implementer**: agent ${input.implementerAgentId}`,
-    `**Reviewer**: you (agent ${input.reviewerAgentId})`,
-    `**Commit**: \`${input.commitHash}\``,
+    `**实现者**: agent ${input.implementerAgentId}`,
+    `**评审者**: 你 (agent ${input.reviewerAgentId})`,
+    `**提交**: \`${input.commitHash}\``,
     input.prUrl ? `**PR**: ${input.prUrl}` : '',
     ``,
-    `## Context`,
+    `## 背景`,
     input.context,
     ``,
-    `## Review checklist (SOP 关键节点把关)`,
+    `## 评审清单 (SOP 关键节点把关)`,
     `- [ ] 是否存在结构性 bug (不只是表面问题)`,
     `- [ ] 是否引入了 ❌6 能力前沿外的实现`,
     `- [ ] 测试是否真覆盖了 happy path 和边界`,
     `- [ ] 是否有 vibe code 痕迹 (没 plan 直接写)`,
     `- [ ] commit message 是否对应 plan 章节`,
     ``,
-    `Reply with verdict: \`approved\` | \`changes-requested: <reason>\``,
+    `回复结论: \`approved\` | \`changes-requested: <原因>\``,
   ].filter(Boolean).join('\n');
 
   const issue = await deps.client.createIssue({
-    title: `Code Review: ${input.commitHash.slice(0, 7)}`,
+    title: `代码评审:${input.commitHash.slice(0, 7)}`,
     body,
     labels: ['代码评审'],
     assigneeId: input.reviewerAgentId,
