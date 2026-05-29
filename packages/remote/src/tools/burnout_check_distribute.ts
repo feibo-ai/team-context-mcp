@@ -56,7 +56,7 @@ export async function burnoutCheckDistribute(
 
   if (input.action === 'distribute') {
     const msg = [
-      `Burnout check · ${input.month} · 匿名（聚合时丢弃 sender）`,
+      `倦怠检查 · ${input.month} · 匿名（聚合时丢弃 sender）`,
       '',
       QUESTIONS.join('\n'),
       '',
@@ -112,20 +112,20 @@ export async function burnoutCheckDistribute(
 
     // Anonymized aggregate (sender info discarded above; only yes/no counts retained)
     const report = [
-      `# Burnout Check · ${input.month}`,
+      `# 倦怠检查 · ${input.month}`,
       '',
-      `**Responses**: ${responses.length}`,
-      `**Total "yes" answers**: ${yesCount}`,
+      `**回复数**: ${responses.length}`,
+      `**"yes" 总数**: ${yesCount}`,
       '',
-      '## Per-question tally (anonymized)',
+      '## 各题统计(匿名)',
       `- Q1 (疲惫): ${responses.filter(r => r.q1 === 'yes').length} yes`,
       `- Q2 (反感通知): ${responses.filter(r => r.q2 === 'yes').length} yes`,
       `- Q3 (下班还想 session): ${responses.filter(r => r.q3 === 'yes').length} yes`,
       '',
-      '## Threshold',
+      '## 阈值',
       yesCount > 0
-        ? `⚠️ At least one "yes" — SOP P-6 Monthly says this month降到 3-5 active 调整. DRI must review.`
-        : '✅ Zero "yes" — continue at baseline 5-10 active.',
+        ? `⚠️ 至少一个 "yes" — 依 SOP P-6 月度,本月降到 3-5 active 调整。DRI 须复核。`
+        : '✅ 零 "yes" — 维持基线 5-10 active。',
     ].join('\n');
 
     const path = join(input.teamContextRepo, 'health', 'burnout', `${input.month}.md`);
@@ -135,8 +135,8 @@ export async function burnoutCheckDistribute(
     let alertIssueId: string | undefined;
     if (yesCount > 0) {
       const issue = await deps.client.createIssue({
-        title: `Burnout signal · ${input.month}`,
-        body: `Burnout check ${input.month} returned ${yesCount} "yes" answer(s). Per SOP P-6, consider reducing active count this month. Report: ${path}`,
+        title: `倦怠预警 · ${input.month}`,
+        body: `倦怠检查 ${input.month} 有 ${yesCount} 个 "yes"。依 SOP P-6,本月考虑降低 active 数。报告:${path}`,
         labels: ['倦怠预警'],
       });
       alertIssueId = issue.id;

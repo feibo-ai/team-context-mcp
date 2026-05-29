@@ -95,7 +95,7 @@ describe('burnout_check_distribute', () => {
     // Each call should target a team email with a text body (no card).
     for (const email of ['alice@x', 'bob@x', 'carol@x']) {
       expect(feishu.dmSendByEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ email, text: expect.stringContaining('Burnout check') }),
+        expect.objectContaining({ email, text: expect.stringContaining('倦怠检查') }),
       );
     }
   });
@@ -160,7 +160,7 @@ describe('burnout_check_distribute', () => {
 
     const stored = await readFile(join(dir, 'health/burnout/2026-05.md'), 'utf-8');
     // Only 2 of 3 members replied with parseable data.
-    expect(stored).toContain('**Responses**: 2');
+    expect(stored).toContain('**回复数**: 2');
     expect(stored).toContain('Q1 (疲惫): 1 yes');
     expect(stored).toContain('Q2 (反感通知): 1 yes');
     expect(stored).toContain('Q3 (下班还想 session): 0 yes');

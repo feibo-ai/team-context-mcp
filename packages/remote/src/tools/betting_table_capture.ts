@@ -28,23 +28,23 @@ export async function bettingTableCapture(
 
   if (input.action === 'open') {
     const lines = [
-      `# Betting Table — week of ${input.weekOf}`,
+      `# 投注表 — ${input.weekOf} 当周`,
       '',
-      `Proposals (${input.proposals.length}):`,
+      `提案 (${input.proposals.length}):`,
       '',
       ...input.proposals.map((p) =>
-        `- **${p.id}** · ${p.title} _(by ${p.proposer})_${p.oneLiner ? ` — ${p.oneLiner}` : ''}`
+        `- **${p.id}** · ${p.title} _(由 ${p.proposer} 提)_${p.oneLiner ? ` — ${p.oneLiner}` : ''}`
       ),
       '',
-      '## Voting',
+      '## 投票',
       '',
-      'Comment on this issue with: `vote: p1, p3` (up to 3 votes per person).',
+      '在本 issue 评论:`vote: p1, p3`(每人最多 3 票)。',
       '',
-      '> Per SOP P-6 W-04: un-voted proposals are DROPPED. No backlog.',
+      '> 依 SOP P-6 W-04:未投票的提案直接丢弃,不留 backlog。',
     ].join('\n');
 
     const issue = await deps.client.createIssue({
-      title: `Betting Table · week of ${input.weekOf}`,
+      title: `投注表 · ${input.weekOf} 当周`,
       body: lines,
       labels: ['投注表'],
     });
@@ -52,7 +52,7 @@ export async function bettingTableCapture(
     return {
       bettingIssueId: issue.id,
       proposalsCount: input.proposals.length,
-      votingInstructions: `Comment "vote: <proposal-ids>" on issue ${issue.id}`,
+      votingInstructions: `在 issue ${issue.id} 评论 "vote: <提案ID>"`,
     };
   }
 
@@ -67,15 +67,15 @@ export async function bettingTableCapture(
 
     // Post tally to issue
     const summary = [
-      '## Voting closed',
+      '## 投票结束',
       '',
       ...ranked.map(([id, count], i) =>
-        `${i < input.topK ? '✅' : '❌'} ${id}: ${count} vote${count > 1 ? 's' : ''}`
+        `${i < input.topK ? '✅' : '❌'} ${id}: ${count} 票`
       ),
       '',
-      `Winners (top ${input.topK}): ${winners.map((w) => w[0]).join(', ')}`,
+      `胜出 (前 ${input.topK}): ${winners.map((w) => w[0]).join(', ')}`,
       '',
-      '**Un-voted/below-cutoff candidates are DROPPED per SOP P-6 W-04. No backlog.**',
+      '**未投票/未进前列的提案依 SOP P-6 W-04 丢弃,不留 backlog。**',
     ].join('\n');
 
     await deps.client.commentOnIssue(input.bettingIssueId, summary);
