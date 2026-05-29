@@ -80,7 +80,11 @@ export function healthHandler(deps: HealthDeps): RequestHandler {
   return async (_req, res) => {
     const out: HealthResponse = {
       status: 'healthy',
-      version: process.env.GIT_SHA ?? 'unknown',
+      // GIT_SHA if explicitly set; otherwise Zeabur injects
+      // ZEABUR_GIT_COMMIT_SHA for git-deployed services (our prod path), so
+      // /health surfaces the live commit. 'unknown' only when run off-platform.
+      version:
+        process.env.GIT_SHA ?? process.env.ZEABUR_GIT_COMMIT_SHA ?? 'unknown',
       uptime_seconds: process.uptime(),
       config_version: deps.configSource.version(),
       // Surface which ConfigSource is wired (helps DRI debug "why isn't

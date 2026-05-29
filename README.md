@@ -2,7 +2,7 @@
 
 Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + Feishu.
 
-- **`@tcmcp/remote`** — 10 tools · HTTP/SSE on `:8443/mcp` · runs in Docker on the DRI's mac · pulls config + secrets from a multica `mcp-server` integration (live, reactive to rotation)
+- **`@tcmcp/remote`** — 10 tools · HTTP/SSE at `mcp.teamctx.actionow.ai/mcp` · runs on Zeabur (project `teamctx`) · pulls config + secrets from a multica `mcp-server` integration (live, reactive to rotation)
 - **`@tcmcp/local`** — 12 tools · stdio · spawned by Claude Code / Codex CLI inside the user's repo checkout · git + file ops only
 
 22 tools total. Architecture is hybrid because some SOP gates (`plan_create`, `case_create`, `session_handoff` …) need access to the user's working tree and `git`, while broadcast / DM / Wiki / METR-decision tools have no local dependency and benefit from a single server-side process owning Feishu tokens.
@@ -12,7 +12,7 @@ Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + F
 ```
 +--------------------+       HTTP/SSE        +---------------------+
 |  Claude / Codex    | --------------------> |  @tcmcp/remote      |
-|  (any team member) |  Bearer <multica jwt> |  Docker · :8443     |
+|  (any team member) |  Bearer <multica jwt> |  Zeabur · teamctx   |
 +--------------------+                       |                     |
         |                                    |  - per-user auth    |
         | stdio                              |    (M-16, /api/me)  |
@@ -94,9 +94,10 @@ Safety · 红线 2 (PB-04 + RPI):
 
 > Drift note from the plan: Plan-5 quoted "21 = 9 remote + 12 local". After M-12 added `read_member_dm`, the actual remote count is **10**, so 22 total. Both servers' `tools/list` agree.
 
-## Install
+## Install · Deploy
 
-See [INSTALL.md](./INSTALL.md). Team members install only `@tcmcp/local` and point their MCP client at the DRI's already-running remote URL. The DRI runs `docker compose up -d` once and rotation works without redeploys.
+- **Team members** — see [INSTALL.md](./INSTALL.md). Install only `@tcmcp/local` and point your MCP client at the always-on remote `https://mcp.teamctx.actionow.ai/mcp`.
+- **Operating the remote** — see [DEPLOY.md](./DEPLOY.md). `@tcmcp/remote` runs on Zeabur with CD on push to `main` (Zeabur builds the Dockerfile); Feishu secret rotation is reactive — no redeploy.
 
 ## Smoke
 
