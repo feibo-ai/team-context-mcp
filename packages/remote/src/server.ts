@@ -494,7 +494,8 @@ async function main(): Promise<void> {
     tracker = new DeploymentTracker({
       client: multicaCp,
       integrationId,
-      imageOrCommit: process.env.GIT_SHA ?? 'dev',
+      imageOrCommit:
+        process.env.GIT_SHA ?? process.env.ZEABUR_GIT_COMMIT_SHA ?? 'dev',
       hostUrl: process.env.HOST_URL,
       getConfigVersion: () => configSource.version(),
     });

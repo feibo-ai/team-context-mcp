@@ -1,3 +1,7 @@
+# LOCAL DEBUG ONLY. Production runs on Zeabur (service `tcmcp-remote-gres`,
+# project `teamctx`) via git-trigger on `main` — see DEPLOY.md. This compose
+# file builds and runs the same image locally against a multica you point
+# MULTICA_URL at; it is not the deployment path.
 services:
   tcmcp-remote:
     build: .

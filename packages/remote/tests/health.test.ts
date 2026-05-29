@@ -55,7 +55,9 @@ describe('healthHandler', () => {
     });
     expect(typeof captured.body!.uptime_seconds).toBe('number');
     expect(captured.body!.uptime_seconds).toBeGreaterThanOrEqual(0);
-    expect(captured.body!.version).toBe(process.env.GIT_SHA ?? 'unknown');
+    expect(captured.body!.version).toBe(
+      process.env.GIT_SHA ?? process.env.ZEABUR_GIT_COMMIT_SHA ?? 'unknown',
+    );
   });
 
   it('marks status degraded when multica.ping throws', async () => {

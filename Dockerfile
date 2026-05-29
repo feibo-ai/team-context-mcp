@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
-# @tcmcp/remote — multi-stage build for local debug (Plan 5 M-21).
+# @tcmcp/remote — multi-stage build. This image IS the production artifact:
+# Zeabur builds it via git-trigger on `main` and runs it as `tcmcp-remote-gres`
+# (see DEPLOY.md). docker-compose.yml builds the same image for local debug.
 #
 # Stage 1 (builder): pnpm install workspace, build the 4 packages we need.
 # Stage 2 (runtime): copy only built dist/ + production node_modules.
