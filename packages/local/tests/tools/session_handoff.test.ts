@@ -55,7 +55,7 @@ describe('session_handoff', () => {
     expect(r.planPath).toContain('plan_2026-05-26_x.md');
 
     const updated = await readFile(r.planPath, 'utf-8');
-    expect(updated).toContain('## Current State');
+    expect(updated).toContain('## 当前状态');
     expect(updated).toContain('wrote foo()');
     expect(updated).toContain('wire bar() into baz.ts');
     expect(updated).toContain('tried mock-X');

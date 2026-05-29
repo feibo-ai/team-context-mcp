@@ -14,7 +14,7 @@ export async function planRequestReview(
 ): Promise<{ commentId: string }> {
   const input = planRequestReviewInput.parse(raw);
 
-  await deps.client.addLabel(input.multicaIssueId, 'plan-under-review');
+  await deps.client.addLabel(input.multicaIssueId, '计划-评审中');
 
   const comment = await deps.client.commentOnIssue(
     input.multicaIssueId,

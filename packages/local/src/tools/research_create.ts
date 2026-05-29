@@ -26,32 +26,32 @@ export async function researchCreate(
     existed = true;
   } catch {
     await mkdir(dirname(researchPath), { recursive: true });
-    const body = `# Research: ${input.slug}
+    const body = `# 研究:${input.slug}
 
-**Date**: ${date}
-**Researcher**: (your name / your-claude-session-id)
+**日期**: ${date}
+**研究者**: (你的名字 / 你的 claude-session-id)
 
-## Question
+## 问题
 ${input.question}
 
-## Findings
+## 发现
 
-### Existing codebase
+### 现有代码
 - TBD
 
-### Prior art
-- TBD (industry papers / similar repos / known references)
+### 先例
+- TBD (行业论文 / 类似仓库 / 已知参考)
 
-### Pitfalls
-- TBD (known failure modes / foot-guns)
+### 陷阱
+- TBD (已知失败模式 / 坑)
 
-### Constraints
-- TBD (team SOP / security / compliance / time)
+### 约束
+- TBD (团队 SOP / 安全 / 合规 / 时间)
 
-## Open questions
-- TBD (things research couldn't answer — must resolve before Plan session)
+## 待解问题
+- TBD (研究没能回答的 — Plan session 前必须解决)
 
-## Recommended approaches (options, not decisions)
+## 推荐方案 (选项,非决定)
 1. TBD
 2. TBD
 3. TBD
@@ -60,9 +60,9 @@ ${input.question}
   }
 
   const issue = await deps.client.createIssue({
-    title: `Research: ${input.slug}`,
+    title: `研究:${input.slug}`,
     body: `Research session for: ${input.question}\n\nFile: \`${researchPath}\``,
-    labels: ['research'],
+    labels: ['研究'],
   });
 
   return { researchPath, multicaIssueId: issue.id, alreadyExisted: existed };

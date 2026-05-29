@@ -63,7 +63,7 @@ export async function sessionHandoff(
 
   // Step 3: idempotency check — refuse if last handoff was < 60s ago
   const planText = await readFile(planPath, 'utf-8');
-  const recent = /Current State \(handoff @ ([\d-T:]+)/.exec(planText);
+  const recent = /当前状态 \(handoff @ ([\d-T:]+)/.exec(planText);
   if (recent) {
     const age = Date.now() - new Date(recent[1]).getTime();
     if (age < 60_000) {
@@ -93,7 +93,7 @@ export async function sessionHandoff(
     `**Pollution signal**: ${input.pollutionSignal}`,
   ].join('\n');
 
-  const updated = upsertSection(planText, 'Current State', block);
+  const updated = upsertSection(planText, '当前状态', block);
   await writeFile(planPath, updated, 'utf-8');
 
   // Step 5: optional multica comment

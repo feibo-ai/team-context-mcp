@@ -42,18 +42,18 @@ export async function planUpgrade(
   const upgradeEntry = [
     `### ${ts} · ${oldVersion} → ${newVersion}`,
     '',
-    `**Reason**: ${input.reason}`,
-    `**Snapshot**: \`${basename(snapshotPath)}\``,
+    `**原因**: ${input.reason}`,
+    `**快照**: \`${basename(snapshotPath)}\``,
   ].join('\n');
 
   const existingLog = matter.stringify('', data); // get fresh frontmatter
-  const upgradedBody = upsertSection(content, 'Upgrade Log', upgradeEntry);
+  const upgradedBody = upsertSection(content, '升级日志', upgradeEntry);
   const newText = matter.stringify(upgradedBody, data);
   await writeFile(input.planPath, newText, 'utf-8');
 
   // Re-label multica issue: remove plan-approved, add plan-draft (will need re-review)
-  await deps.client.addLabel(input.multicaIssueId, 'plan-upgraded');
-  await deps.client.addLabel(input.multicaIssueId, 'plan-draft');
+  await deps.client.addLabel(input.multicaIssueId, '计划-已升级');
+  await deps.client.addLabel(input.multicaIssueId, '计划-草稿');
 
   return { oldVersion, newVersion, snapshotPath };
 }

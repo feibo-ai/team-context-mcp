@@ -15,8 +15,15 @@
  */
 import type { MockAgent, MockPool } from 'undici';
 
-/** Canonical 11 labels from team-context standards/labels.md, with stub UUIDs. */
+/**
+ * Canonical labels with stub UUIDs. English names are kept as legacy aliases so
+ * generic client tests + the still-English remote tools (code-review /
+ * betting-table / burnout-alert) keep resolving; the Chinese names are the
+ * current ones applied by the localized plan / case / research tools and map to
+ * the same stub UUIDs (same label concept, renamed in multica).
+ */
 export const STANDARD_LABEL_MAP: Record<string, string> = {
+  // English (legacy aliases)
   'plan-draft': 'lbl-plan-draft',
   'plan-under-review': 'lbl-plan-under-review',
   'plan-approved': 'lbl-plan-approved',
@@ -29,6 +36,14 @@ export const STANDARD_LABEL_MAP: Record<string, string> = {
   'code-review': 'lbl-code-review',
   'research': 'lbl-research',
   'urgent': 'lbl-urgent',
+  // Chinese (current — applied by the localized tools)
+  '计划-草稿': 'lbl-plan-draft',
+  '计划-评审中': 'lbl-plan-under-review',
+  '计划-已批准': 'lbl-plan-approved',
+  '计划-已升级': 'lbl-plan-upgraded',
+  '复盘-待审': 'lbl-debrief',
+  '复盘-已审': 'lbl-debrief-reviewed',
+  '研究': 'lbl-research',
 };
 
 /**

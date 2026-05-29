@@ -55,9 +55,9 @@ export async function caseCreate(
   await writeFile(casePath, body, 'utf-8');
 
   const issue = await deps.client.createIssue({
-    title: `Debrief: ${input.slug}`,
+    title: `复盘:${input.slug}`,
     body: `Case file: \`${casePath}\``,
-    labels: ['debrief'],
+    labels: ['复盘-待审'],
     projectId: input.multicaProjectId,
   });
 
@@ -74,7 +74,7 @@ function renderCase(i: CaseCreateInput): string {
   const judgments = i.keyJudgments
     .map(
       (j) =>
-        `### Judgment: ${j.title}\n` +
+        `### 判断:${j.title}\n` +
         `- **Context:** ${j.context}\n` +
         `- **Options:** ${j.options.join(' / ')}\n` +
         `- **Chose:** ${j.chose}\n` +

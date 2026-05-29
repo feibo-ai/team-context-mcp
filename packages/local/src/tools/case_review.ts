@@ -33,7 +33,7 @@ export async function caseReview(
   const updated = upsertSection(text, '4. Key judgments', reviewBlock);
   await writeFile(input.casePath, updated, 'utf-8');
 
-  await deps.client.addLabel(input.multicaIssueId, 'debrief-reviewed');
+  await deps.client.addLabel(input.multicaIssueId, '复盘-已审');
 
   return { reviewed: true, reviewedAt };
 }
