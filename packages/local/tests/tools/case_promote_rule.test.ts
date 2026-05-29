@@ -13,11 +13,11 @@ describe('case_promote_rule', () => {
     await writeFile(
       join(dir, 'case.md'),
       [
-        '# Case: foo',
+        '# 复盘:foo',
         '',
-        '## 5. General rule candidates',
-        '- [ ] needs DRI promotion decision: Always check X before Y',
-        '- [ ] needs DRI promotion decision: Never Z on Mondays',
+        '## 5. 通用规则候选',
+        '- [ ] 待 DRI 决定是否晋升: Always check X before Y',
+        '- [ ] 待 DRI 决定是否晋升: Never Z on Mondays',
         '',
       ].join('\n')
     );
@@ -44,6 +44,6 @@ describe('case_promote_rule', () => {
     expect(claudeMd).toContain('Always check X before Y');
 
     const caseTxt = await readFile(join(dir, 'case.md'), 'utf-8');
-    expect(caseTxt).toContain('[x] PROMOTED ' + new Date().toISOString().slice(0, 10));
+    expect(caseTxt).toContain('[x] 已晋升 ' + new Date().toISOString().slice(0, 10));
   });
 });

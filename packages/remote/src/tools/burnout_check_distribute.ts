@@ -137,7 +137,7 @@ export async function burnoutCheckDistribute(
       const issue = await deps.client.createIssue({
         title: `Burnout signal · ${input.month}`,
         body: `Burnout check ${input.month} returned ${yesCount} "yes" answer(s). Per SOP P-6, consider reducing active count this month. Report: ${path}`,
-        labels: ['burnout-alert', 'urgent'],
+        labels: ['倦怠预警', 'urgent'],
       });
       alertIssueId = issue.id;
     }

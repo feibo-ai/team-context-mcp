@@ -75,33 +75,33 @@ function renderCase(i: CaseCreateInput): string {
     .map(
       (j) =>
         `### 判断:${j.title}\n` +
-        `- **Context:** ${j.context}\n` +
-        `- **Options:** ${j.options.join(' / ')}\n` +
-        `- **Chose:** ${j.chose}\n` +
-        `- **In hindsight:** ${j.inHindsight}\n` +
-        `- **"Ancient impossible" check:** ${j.ancientImpossible}\n`
+        `- **背景:** ${j.context}\n` +
+        `- **选项:** ${j.options.join(' / ')}\n` +
+        `- **选择:** ${j.chose}\n` +
+        `- **事后看:** ${j.inHindsight}\n` +
+        `- **"古法不可能"检验:** ${j.ancientImpossible}\n`
     )
     .join('\n');
 
   const candidates = i.ruleCandidates.length
-    ? i.ruleCandidates.map((c) => `- [ ] needs DRI promotion decision: ${c}`).join('\n')
-    : '_(none — no general rule candidates from this project)_';
+    ? i.ruleCandidates.map((c) => `- [ ] 待 DRI 决定是否晋升: ${c}`).join('\n')
+    : '_(无 — 本项目无通用规则候选)_';
 
-  return `# Case: ${i.slug}
+  return `# 复盘:${i.slug}
 
-## 1. Goal
+## 1. 目标
 ${i.goal}
 
-## 2. What actually happened
+## 2. 实际发生了什么
 ${i.whatHappened}
 
-## 3. Completion criteria
+## 3. 完成标准
 ${criteria}
 
-## 4. Key judgments
+## 4. 关键判断
 ${judgments}
 
-## 5. General rule candidates
+## 5. 通用规则候选
 ${candidates}
 `;
 }

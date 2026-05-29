@@ -34,7 +34,7 @@ describe('case_review', () => {
 
   it('refuses if section 4 is trivially short', async () => {
     const casePath = join(dir, 'case.md');
-    await writeFile(casePath, `# Case\n\n## 4. Key judgments\n${TRIVIAL}\n\n## 5. General rule candidates\n`);
+    await writeFile(casePath, `# Case\n\n## 4. 关键判断\n${TRIVIAL}\n\n## 5. 通用规则候选\n`);
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
     await expect(caseReview({
       casePath, multicaIssueId: 'i1', reviewerEmail: 'a@b',
@@ -47,7 +47,7 @@ describe('case_review', () => {
     pool.intercept({ path: '/api/issues/i1/labels', method: 'POST' }).reply(201, {});
 
     const casePath = join(dir, 'case.md');
-    await writeFile(casePath, `# Case\n\n## 4. Key judgments\n${SUBSTANTIVE}\n\n## 5. General rule candidates\n`);
+    await writeFile(casePath, `# Case\n\n## 4. 关键判断\n${SUBSTANTIVE}\n\n## 5. 通用规则候选\n`);
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
 
     const r = await caseReview({

@@ -45,7 +45,7 @@ export async function codeReviewRequest(
   const issue = await deps.client.createIssue({
     title: `Code Review: ${input.commitHash.slice(0, 7)}`,
     body,
-    labels: ['code-review'],
+    labels: ['代码评审'],
     assigneeId: input.reviewerAgentId,
     assigneeType: 'agent',
   });
