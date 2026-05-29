@@ -52,6 +52,40 @@ describe('MulticaClient', () => {
     // informational only; the assertion here is that the issue id round-trips.
   });
 
+  it('createIssue converts camelCase projectId/assigneeId/assigneeType to snake_case', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    let sentBody: Record<string, unknown> = {};
+    pool
+      .intercept({ path: '/api/issues', method: 'POST' })
+      .reply(201, (opts: { body?: string }) => {
+        sentBody = JSON.parse(opts.body ?? '{}');
+        return JSON.parse(issueFixture);
+      });
+    interceptAnyLabelAdd(pool);
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 'mul_test',
+      workspaceId: 'ws_test',
+      labelMap: STANDARD_LABEL_MAP,
+    });
+
+    await client.createIssue({
+      title: 'x',
+      projectId: 'proj_xyz',
+      assigneeId: 'agent_1',
+      assigneeType: 'agent',
+    });
+
+    // Backend (Go) expects snake_case and silently drops unknown camelCase.
+    expect(sentBody.project_id).toBe('proj_xyz');
+    expect(sentBody.assignee_id).toBe('agent_1');
+    expect(sentBody.assignee_type).toBe('agent');
+    expect(sentBody.projectId).toBeUndefined();
+    expect(sentBody.assigneeId).toBeUndefined();
+    expect(sentBody.assigneeType).toBeUndefined();
+  });
+
   it('throws on 401 with helpful message', async () => {
     mockAgent
       .get('http://multica.test')
