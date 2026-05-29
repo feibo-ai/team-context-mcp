@@ -16,11 +16,15 @@
 import type { MockAgent, MockPool } from 'undici';
 
 /**
- * Canonical labels with stub UUIDs. English names are kept as legacy aliases so
- * generic client tests + the still-English remote tools (code-review /
- * betting-table / burnout-alert) keep resolving; the Chinese names are the
- * current ones applied by the localized plan / case / research tools and map to
- * the same stub UUIDs (same label concept, renamed in multica).
+ * Canonical labels with stub UUIDs. The Chinese names are what the tools apply
+ * now; the English names are kept as legacy aliases so the generic MulticaClient
+ * tests + the multica-issue-create fixture (still English) keep resolving. Both
+ * map to the same stub UUID (same label, renamed in multica).
+ *
+ * NOTE: there is intentionally NO `urgent` entry — it is not one of multica's
+ * real labels, so resolving it must FAIL in tests exactly as it does in prod.
+ * (A stale `urgent` alias here previously masked a production break in
+ * burnout_check_distribute.)
  */
 export const STANDARD_LABEL_MAP: Record<string, string> = {
   // English (legacy aliases)
@@ -35,7 +39,6 @@ export const STANDARD_LABEL_MAP: Record<string, string> = {
   'burnout-alert': 'lbl-burnout-alert',
   'code-review': 'lbl-code-review',
   'research': 'lbl-research',
-  'urgent': 'lbl-urgent',
   // Chinese (current — applied by the localized tools)
   '计划-草稿': 'lbl-plan-draft',
   '计划-评审中': 'lbl-plan-under-review',
