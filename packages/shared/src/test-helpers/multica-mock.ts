@@ -44,6 +44,9 @@ export const STANDARD_LABEL_MAP: Record<string, string> = {
   '复盘-待审': 'lbl-debrief',
   '复盘-已审': 'lbl-debrief-reviewed',
   '研究': 'lbl-research',
+  '代码评审': 'lbl-code-review',
+  '投注表': 'lbl-betting-table',
+  '倦怠预警': 'lbl-burnout-alert',
 };
 
 /**

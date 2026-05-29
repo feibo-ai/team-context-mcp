@@ -59,11 +59,11 @@ describe('case_create', () => {
 
     expect(r.casePath).toMatch(/cases\/\d{4}-\d{2}-\d{2}-feed-latency\.md/);
     const content = await readFile(r.casePath, 'utf-8');
-    expect(content).toContain('## 1. Goal');
-    expect(content).toContain('## 2. What actually happened');
-    expect(content).toContain('## 3. Completion criteria');
-    expect(content).toContain('## 4. Key judgments');
-    expect(content).toContain('## 5. General rule candidates');
+    expect(content).toContain('## 1. 目标');
+    expect(content).toContain('## 2. 实际发生了什么');
+    expect(content).toContain('## 3. 完成标准');
+    expect(content).toContain('## 4. 关键判断');
+    expect(content).toContain('## 5. 通用规则候选');
   });
 
   it('refuses to overwrite an existing case file', async () => {

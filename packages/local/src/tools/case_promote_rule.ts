@@ -21,7 +21,7 @@ export async function casePromoteRule(
   // 1. Read case file, find the matching candidate line
   const caseTxt = await readFile(input.casePath, 'utf-8');
   const linePattern = new RegExp(
-    `^- \\[ \\] needs DRI promotion decision: ${escape(input.ruleText)}\\s*$`,
+    `^- \\[ \\] 待 DRI 决定是否晋升: ${escape(input.ruleText)}\\s*$`,
     'm'
   );
   if (!linePattern.test(caseTxt)) {
@@ -52,7 +52,7 @@ export async function casePromoteRule(
   const today = new Date().toISOString().slice(0, 10);
   const newCase = caseTxt.replace(
     linePattern,
-    `- [x] PROMOTED ${today}: ${input.ruleText}`
+    `- [x] 已晋升 ${today}: ${input.ruleText}`
   );
   await writeFile(input.casePath, newCase, 'utf-8');
 

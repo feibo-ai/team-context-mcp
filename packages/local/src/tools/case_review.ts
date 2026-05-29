@@ -20,17 +20,17 @@ export async function caseReview(
   const input = caseReviewInput.parse(raw);
   const text = await readFile(input.casePath, 'utf-8');
 
-  const section4 = findSection(text, '4. Key judgments');
+  const section4 = findSection(text, '4. 关键判断');
   if (!section4 || section4.length < MIN_SECTION_4_CHARS) {
     throw new Error(
-      `section 4 "Key judgments" too short (${section4?.length ?? 0} chars < ${MIN_SECTION_4_CHARS}). SOP Section 4 requires substantive analysis — not a placeholder.`
+      `section 4 "关键判断" too short (${section4?.length ?? 0} chars < ${MIN_SECTION_4_CHARS}). SOP Section 4 requires substantive analysis — not a placeholder.`
     );
   }
 
   const reviewedAt = new Date().toISOString();
   // Test regex uses `Reviewed by:\s*<email>` — don't bold-wrap (would produce `:**` not `:` + space).
   const reviewBlock = `${section4}\n\n---\nReviewed by: ${input.reviewerEmail}\nReviewed at: ${reviewedAt}`;
-  const updated = upsertSection(text, '4. Key judgments', reviewBlock);
+  const updated = upsertSection(text, '4. 关键判断', reviewBlock);
   await writeFile(input.casePath, updated, 'utf-8');
 
   await deps.client.addLabel(input.multicaIssueId, '复盘-已审');

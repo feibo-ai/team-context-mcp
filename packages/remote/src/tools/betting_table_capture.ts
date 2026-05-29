@@ -46,7 +46,7 @@ export async function bettingTableCapture(
     const issue = await deps.client.createIssue({
       title: `Betting Table · week of ${input.weekOf}`,
       body: lines,
-      labels: ['betting-table'],
+      labels: ['投注表'],
     });
 
     return {
