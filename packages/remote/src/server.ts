@@ -356,6 +356,23 @@ export function zodToJsonSchema(s: z.ZodTypeAny): unknown {
   return out;
 }
 
+/**
+ * Union / discriminatedUnion → keep `oneOf` for the mutual-exclusivity
+ * semantics, but ALSO merge every branch's `properties` up to the root. Without
+ * the merged root `properties`, strict MCP clients see a tool that "takes no
+ * params" and strip the caller's args (Bug A′ — hit notify_team / betting_table
+ * _capture / burnout_check_distribute). `required` is intentionally left empty:
+ * the fields are per-branch (either/or), so none is universally required.
+ */
+function mergeUnion(branches: unknown[]): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  for (const b of branches) {
+    const bp = (b as { properties?: Record<string, unknown> }).properties;
+    if (bp) Object.assign(properties, bp);
+  }
+  return { type: 'object', properties, oneOf: branches };
+}
+
 function walk(s: z.ZodTypeAny): unknown {
   // Avoid importing zod runtime at the top of this file by deferring to the
   // tools' own zod types. We use a tagged-name dispatch instead of instanceof
@@ -395,12 +412,12 @@ function walk(s: z.ZodTypeAny): unknown {
       const opts = (s as unknown as { options: Map<unknown, z.ZodTypeAny> | z.ZodTypeAny[] })
         .options;
       const arr: z.ZodTypeAny[] = opts instanceof Map ? Array.from(opts.values()) : opts;
-      return { oneOf: arr.map((o) => walk(o)) };
+      return mergeUnion(arr.map((o) => walk(o)));
     }
     case 'ZodUnion': {
       const opts = (s as unknown as { _def: { options: z.ZodTypeAny[] } })._def
         .options;
-      return { oneOf: opts.map((o) => walk(o)) };
+      return mergeUnion(opts.map((o) => walk(o)));
     }
     case 'ZodRecord':
       return {

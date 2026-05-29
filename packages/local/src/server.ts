@@ -157,10 +157,26 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-// Minimal zod → JSON Schema (covers the schemas the 12 local tools use).
-// Mirrors the implementation that lived in the old root src/server.ts so the
-// shape MCP clients see for ListTools is unchanged.
-function zodToJsonSchema(s: z.ZodTypeAny): unknown {
+// Minimal zod → JSON Schema. Mirrors @tcmcp/remote's walker. Exported so tests
+// can pin the union contract (Bug A′) without spawning the stdio server.
+
+/**
+ * Union / discriminatedUnion → keep `oneOf` but merge each branch's properties
+ * to the root, else strict MCP clients see a "no-params" tool and strip args
+ * (Bug A′). No local tool uses a top-level union today; this keeps parity with
+ * the remote walker so a future one can't silently ship broken. required left
+ * empty (per-branch / either-or).
+ */
+function mergeUnion(branches: unknown[]): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  for (const b of branches) {
+    const bp = (b as { properties?: Record<string, unknown> }).properties;
+    if (bp) Object.assign(properties, bp);
+  }
+  return { type: 'object', properties, oneOf: branches };
+}
+
+export function zodToJsonSchema(s: z.ZodTypeAny): unknown {
   if (s instanceof z.ZodObject) {
     const shape = (s as z.ZodObject<z.ZodRawShape>).shape;
     const properties: Record<string, unknown> = {};
@@ -187,11 +203,11 @@ function zodToJsonSchema(s: z.ZodTypeAny): unknown {
     const opts = (s as z.ZodDiscriminatedUnion<string, z.ZodObject<z.ZodRawShape>[]>)
       .options;
     const arr: z.ZodTypeAny[] = opts instanceof Map ? Array.from(opts.values()) : opts;
-    return { oneOf: arr.map((o) => zodToJsonSchema(o)) };
+    return mergeUnion(arr.map((o) => zodToJsonSchema(o)));
   }
   if (s instanceof z.ZodUnion) {
     const opts = (s as z.ZodUnion<readonly [z.ZodTypeAny, ...z.ZodTypeAny[]]>)._def.options;
-    return { oneOf: opts.map((o: z.ZodTypeAny) => zodToJsonSchema(o)) };
+    return mergeUnion(opts.map((o: z.ZodTypeAny) => zodToJsonSchema(o)));
   }
   if (s instanceof z.ZodRecord) {
     return {
@@ -211,7 +227,11 @@ function zodToJsonSchema(s: z.ZodTypeAny): unknown {
   return {};
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run main() when executed directly (not when imported by tests) —
+// mirrors @tcmcp/remote/src/server.ts.
+if (import.meta.url === `file://${process.argv[1] ?? ''}`.replace(/\\/g, '/')) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
