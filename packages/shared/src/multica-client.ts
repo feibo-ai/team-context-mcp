@@ -74,10 +74,20 @@ export class MulticaClient {
    * `label_id` UUID rather than a name (hence the label cache).
    */
   async createIssue(params: CreateIssueParams): Promise<MulticaIssue> {
-    const { body, labels, ...rest } = params;
+    const { body, labels, projectId, assigneeId, assigneeType, ...rest } = params;
     const issue = await this.req<MulticaIssue>('/api/issues', {
       method: 'POST',
-      body: { ...rest, description: body },
+      body: {
+        ...rest,
+        description: body,
+        // multica's Go API uses snake_case and silently drops unknown
+        // camelCase keys on unmarshal — convert the 3 that CreateIssueParams
+        // exposes, else project_id / assignee_* are lost (issue created
+        // unlinked, which is how plan issues ended up with project_id:null).
+        ...(projectId ? { project_id: projectId } : {}),
+        ...(assigneeId ? { assignee_id: assigneeId } : {}),
+        ...(assigneeType ? { assignee_type: assigneeType } : {}),
+      },
     });
     if (labels && labels.length > 0) {
       for (const name of labels) {

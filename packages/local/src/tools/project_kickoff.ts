@@ -19,6 +19,7 @@ export async function projectKickoff(
   researchPath: string;
   planPath: string;
   multicaProjectId: string;
+  multicaResearchIssueId: string;
   multicaIssueId: string;
   broadcastSuggestion: {
     tool: 'notify_team';
@@ -106,10 +107,26 @@ _(首次交接前为空)_
     body: { title: input.slug, description: input.topic },
   });
 
-  // Create initial issue
+  // Research is a standalone tracking unit (研究 label). Create its issue first
+  // so the plan issue can link to it. NOTE: this is a scaffold STUB — real
+  // research still needs a fresh rpi-research session (flagged in the body).
+  const researchIssue = await deps.client.createIssue({
+    title: `研究:${input.slug}`,
+    body:
+      `Research stub: \`${researchPath}\`\n` +
+      `⚠️ 这是脚手架占位 · 真调研需另开 fresh session 跑 rpi-research 深度填充。\n\n` +
+      `Part of project kickoff for ${input.slug}.`,
+    labels: ['研究'],
+    projectId: project.id,
+  });
+
+  // Plan issue, linked to the research issue above.
   const issue = await deps.client.createIssue({
     title: `计划:${input.slug}`,
-    body: `Project kickoff via project_kickoff tool.\n\nPlan: \`${planPath}\`\nResearch: \`${researchPath}\``,
+    body:
+      `Project kickoff via project_kickoff tool.\n\n` +
+      `Plan: \`${planPath}\`\nResearch: \`${researchPath}\`\n` +
+      `Research issue: ${researchIssue.id}`,
     labels: ['计划-草稿'],
     projectId: project.id,
   });
@@ -123,6 +140,7 @@ _(首次交接前为空)_
   return {
     researchPath, planPath,
     multicaProjectId: project.id,
+    multicaResearchIssueId: researchIssue.id,
     multicaIssueId: issue.id,
     broadcastSuggestion: {
       tool: 'notify_team',

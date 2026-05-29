@@ -28,8 +28,12 @@ describe('project_kickoff', () => {
     interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/projects', method: 'POST' })
       .reply(201, { id: 'proj_k1', title: 'kickoff-test' });
+    // Two createIssue calls now: research first, then plan. undici consumes
+    // intercepts in registration order.
     pool.intercept({ path: '/api/issues', method: 'POST' })
-      .reply(201, { id: 'issue_k1', labels: ['plan-draft'] });
+      .reply(201, { id: 'research_k1', labels: ['研究'] });
+    pool.intercept({ path: '/api/issues', method: 'POST' })
+      .reply(201, { id: 'issue_k1', labels: ['计划-草稿'] });
 
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
@@ -44,6 +48,7 @@ describe('project_kickoff', () => {
     expect(r.researchPath).toMatch(/docs\/research\/research_\d{4}-\d{2}-\d{2}_kickoff-test\.md/);
     expect(r.planPath).toMatch(/docs\/plans\/plan_\d{4}-\d{2}-\d{2}_kickoff-test\.md/);
     expect(r.multicaProjectId).toBe('proj_k1');
+    expect(r.multicaResearchIssueId).toBe('research_k1');
     expect(r.multicaIssueId).toBe('issue_k1');
 
     expect(r.broadcastSuggestion.tool).toBe('notify_team');

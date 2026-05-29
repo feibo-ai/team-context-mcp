@@ -90,7 +90,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'project_kickoff',
     description:
-      'Phase 01 kickoff: create multica project + research/plan stubs + broadcast.',
+      'Scaffold Phase 01: creates project + research issue + plan issue + empty file stubs. Does NOT run deep research and does NOT send broadcast — chain rpi-research (Step 2) and notify_team (Step 1/6) separately.',
     schema: projectKickoffInput,
     handler: (i, d) =>
       projectKickoff(i as z.infer<typeof projectKickoffInput>, d),
