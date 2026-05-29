@@ -51,7 +51,8 @@ export async function planUpgrade(
   const newText = matter.stringify(upgradedBody, data);
   await writeFile(input.planPath, newText, 'utf-8');
 
-  // Re-label multica issue: remove plan-approved, add plan-draft (will need re-review)
+  // Re-label multica issue: add 计划-已升级 + 计划-草稿 (addLabel only adds — it does
+  // not remove 计划-已批准; the 计划-草稿 label is what signals it needs re-review).
   await deps.client.addLabel(input.multicaIssueId, '计划-已升级');
   await deps.client.addLabel(input.multicaIssueId, '计划-草稿');
 

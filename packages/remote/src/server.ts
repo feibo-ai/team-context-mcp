@@ -250,7 +250,7 @@ export function buildToolDefs(): ToolDef[] {
     },
     {
       name: 'betting_table_capture',
-      description: 'Friday betting-table issue (open / close / tally).',
+      description: 'Friday 投注表 issue (open / close / tally).',
       schema: bettingTableCaptureInput,
       handler: (i, d) =>
         bettingTableCapture(
@@ -280,7 +280,7 @@ export function buildToolDefs(): ToolDef[] {
     {
       name: 'code_review_request',
       description:
-        'Block self-review (❌1). Assign a reviewer + code-review label.',
+        'Block self-review (❌1). Assign a reviewer + 代码评审 label.',
       schema: codeReviewRequestInput,
       handler: (i, d) =>
         codeReviewRequest(
