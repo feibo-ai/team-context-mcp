@@ -10,7 +10,7 @@ function spyClient() {
     addLabel: vi.fn(async () => {}),
     removeLabel: vi.fn(async () => {}),
     updateIssue: vi.fn(async () => ({})),
-    uploadFile: vi.fn().mockResolvedValue({ id: 'att-2' }),
+    uploadFile: vi.fn().mockResolvedValue({ id: 'att-2', url: '/uploads/ws/att-2.html' }),
     commentOnIssue: vi.fn().mockResolvedValue({ id: 'c1' }),
   } as unknown as MulticaClient;
 }
@@ -99,6 +99,13 @@ describe('plan_upgrade', () => {
     expect(client.removeLabel).toHaveBeenCalledWith('issue_p1', '计划-已批准');
     expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-已升级');
     expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
+
+    // After a successful upload (with url), the doc is embedded into the issue
+    // description (!file token) + bound via attachmentIds so it renders inline.
+    const embedArg = (client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.description?.includes('!file['))?.[1];
+    expect(embedArg).toBeDefined();
+    expect(embedArg.description).toContain('!file[');
+    expect(embedArg.attachmentIds).toContain('att-2');
   });
 
   it('upload failure is non-fatal — labels/status land, comment notes the failure', async () => {

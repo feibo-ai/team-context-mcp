@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { fileEmbed } from '@tcmcp/shared';
 import { renderPlanHtml } from '../render/plan-html.js';
 import type { PlanCreateInput } from './plan_create.js';
 
@@ -61,6 +62,14 @@ export async function planUpgrade(
         'text/html'
       );
       attachmentId = att.id;
+      // Embed the doc in the issue description so it renders inline in the issue
+      // body (issue-level binding alone has no render surface — see fileEmbed).
+      if (att.url) {
+        await deps.client.updateIssue(input.multicaIssueId, {
+          description: `计划文档 v${version}(方案A · 下方渲染):\n\n${fileEmbed(`plan_v${version}.html`, att.url)}`,
+          attachmentIds: [att.id],
+        });
+      }
     } catch (e) {
       // Upload failure is non-fatal — the label/status transition already
       // landed and the local HTML is written; surface the error to the caller.

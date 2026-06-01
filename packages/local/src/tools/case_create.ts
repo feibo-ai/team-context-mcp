@@ -2,6 +2,7 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { fileEmbed } from '@tcmcp/shared';
 import { renderCaseHtml } from '../render/case-html.js';
 
 export const caseCreateInput = z.object({
@@ -79,9 +80,18 @@ export async function caseCreate(
   // already the source of truth.
   let attachmentId: string | null = null;
   let uploadError: string | undefined;
+  const filename = `case_${date}_${input.slug}_v1.html`;
   try {
-    const att = await deps.client.uploadFile(html, `case_${date}_${input.slug}_v1.html`, issue.id, 'text/html');
+    const att = await deps.client.uploadFile(html, filename, issue.id, 'text/html');
     attachmentId = att.id;
+    // Embed the doc in the issue description so it renders inline in the issue
+    // body (issue-level binding alone has no render surface — see fileEmbed).
+    if (att.url) {
+      await deps.client.updateIssue(issue.id, {
+        description: `案例文档(方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
+        attachmentIds: [att.id],
+      });
+    }
   } catch (e) {
     uploadError = (e as Error).message;
   }
