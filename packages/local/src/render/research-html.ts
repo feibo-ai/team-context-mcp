@@ -7,8 +7,8 @@ type ResearchCreateInput = z.infer<typeof researchCreateInput>;
 export function renderResearchHtml(input: ResearchCreateInput): string {
   const sections = [
     `<h2>问题</h2><div class="field"><div class="field-label">Question</div>${esc(input.question)}</div>`,
-    `<h2>发现</h2><div class="field"><div class="field-label">Findings</div>_(待 fresh session 深度调研填充)_</div>`,
-    `<h2>待解问题</h2><div class="field">_(research 过程中浮现的开放问题)_</div>`,
+    `<h2>发现</h2><div class="field"><div class="field-label">Findings</div>(待 fresh session 深度调研填充)</div>`,
+    `<h2>待解问题</h2><div class="field">(research 过程中浮现的开放问题)</div>`,
   ].join('\n');
 
   return renderShell({

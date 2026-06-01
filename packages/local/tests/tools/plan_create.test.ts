@@ -63,6 +63,32 @@ describe('plan_create', () => {
     expect(result.attachmentId).toBe('att-1');
   });
 
+  it('upload failure is non-fatal — issue created + local file written, uploadError surfaced', async () => {
+    uploadFile.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    const result = await planCreate(
+      {
+        projectPath: dir,
+        slug: 'feed-latency',
+        layer: 'project',
+        dri: 'alice',
+        goal: 'Reduce p99 to <400ms',
+        completionCriteria: ['p99 <400ms over 24h prod'],
+        appetite: '1 week',
+      },
+      { client }
+    );
+
+    // issue still created, no rollback
+    expect(result.multicaIssueId).toBe('issue_p1');
+    // upload failed → null attachment + surfaced error (§4c contract)
+    expect(result.attachmentId).toBeNull();
+    expect(result.uploadError).toMatch(/ECONNREFUSED/);
+    // local HTML still written despite the upload failure
+    const content = await readFile(result.planPath, 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+  });
+
   it('is idempotent — second call reuses existing plan file', async () => {
     const args = {
       projectPath: dir,

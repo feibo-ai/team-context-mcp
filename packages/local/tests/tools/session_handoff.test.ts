@@ -132,5 +132,34 @@ describe('session_handoff', () => {
     const onDisk = await readFile(planHtmlPath, 'utf-8');
     expect(onDisk).toContain('Reduce p99 to &lt;400ms');
     expect(onDisk).not.toContain('>old<');
+
+    // regenerated HTML carries the handoff/Current-State section (B2) — not just
+    // the issue comment
+    expect(onDisk).toContain('当前状态');
+    expect(onDisk).toContain('wire bar()');
+    expect(onDisk).toContain('You-are-right loop');
+  });
+
+  it('does NOT corrupt an .html plan when no planInput (B1 regression)', async () => {
+    const planHtmlPath = join(dir, 'docs', 'plans', 'plan_2026-05-26_x.html');
+    const original = '<!DOCTYPE html><html><body><h1>plan</h1></body></html>';
+    await writeFile(planHtmlPath, original, 'utf-8');
+
+    await sessionHandoff(
+      {
+        projectPath: dir,
+        planPath: planHtmlPath,
+        currentState: 'wrote foo()',
+        nextAction: 'wire bar()',
+        pollutionSignal: 'You-are-right loop',
+      },
+      {}
+    );
+
+    // No planInput + .html plan → the file must be left byte-for-byte untouched
+    // (a markdown ## section appended after </html> would corrupt it).
+    const onDisk = await readFile(planHtmlPath, 'utf-8');
+    expect(onDisk).toBe(original);
+    expect(onDisk).not.toContain('## 当前状态');
   });
 });

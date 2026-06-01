@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { GitOps } from '@tcmcp/shared';
 import { upsertSection } from '@tcmcp/shared';
 import type { MulticaClient } from '@tcmcp/shared';
-import { renderPlanHtml } from '../render/plan-html.js';
+import { renderPlanHtml, type HandoffState } from '../render/plan-html.js';
 import type { PlanCreateInput } from './plan_create.js';
 
 export const sessionHandoffInput = z.object({
@@ -68,10 +68,14 @@ export async function sessionHandoff(
 
   // Step 2: locate plan
   const planPath = input.planPath || (await findLatestPlan(input.projectPath));
+  const isHtml = planPath.toLowerCase().endsWith('.html');
 
-  // Step 3: idempotency check — refuse if last handoff was < 60s ago
+  // Step 3: idempotency check — refuse if last handoff was < 60s ago. The marker
+  // only exists in markdown plans (HTML plans are regenerated, not appended), so
+  // this is a no-op safeguard for .html — duplicate HTML handoffs are harmless
+  // (extra comment + attachment, no corruption).
   const planText = await readFile(planPath, 'utf-8');
-  const recent = /当前状态 \(handoff @ ([\d-T:]+)/.exec(planText);
+  const recent = /handoff @ (\d{4}-\d{2}-\d{2} \d{2}:\d{2})/.exec(planText);
   if (recent) {
     const age = Date.now() - new Date(recent[1]).getTime();
     if (age < 60_000) {
@@ -101,8 +105,13 @@ export async function sessionHandoff(
     `**Pollution signal**: ${input.pollutionSignal}`,
   ].join('\n');
 
-  const updated = upsertSection(planText, '当前状态', block);
-  await writeFile(planPath, updated, 'utf-8');
+  // Persist to the local plan file ONLY for markdown plans — appending a
+  // markdown section to a generated .html doc would corrupt it (glue text after
+  // </html>). For HTML plans the Current State lives in the issue comment
+  // (Step 5) and the regenerated HTML's handoff section (Step 6).
+  if (!isHtml) {
+    await writeFile(planPath, upsertSection(planText, '当前状态', block), 'utf-8');
+  }
 
   // Step 5: optional multica comment (existing behavior — unchanged)
   let multicaCommentId: string | undefined;
@@ -115,8 +124,20 @@ export async function sessionHandoff(
   // a NEW attachment. Backward-compatible: only runs when the full structured
   // plan AND an issue id are provided. Comment behavior above stays untouched.
   if (input.planInput && input.multicaIssueId && deps.client) {
-    const html = renderPlanHtml(input.planInput);
-    if (input.planPath) await writeFile(input.planPath, html, 'utf-8');
+    const handoff: HandoffState = {
+      at: ts,
+      lastCommit: commitHash.slice(0, 7),
+      branch: status.branch,
+      done: input.currentState,
+      nextAction: input.nextAction,
+      deadEnds: input.deadEnds,
+      pollutionSignal: input.pollutionSignal,
+    };
+    const html = renderPlanHtml(input.planInput, handoff);
+    // Overwrite the local file with the regenerated HTML. Use the RESOLVED
+    // planPath (not input.planPath, which is undefined when auto-discovered),
+    // and only when it's actually an .html plan.
+    if (isHtml) await writeFile(planPath, html, 'utf-8');
     try {
       await deps.client.uploadFile(
         html,
@@ -125,7 +146,7 @@ export async function sessionHandoff(
         'text/html'
       );
     } catch {
-      /* non-fatal */
+      /* non-fatal — comment already posted, local file written */
     }
   }
 
@@ -135,10 +156,10 @@ export async function sessionHandoff(
 async function findLatestPlan(projectPath: string): Promise<string> {
   const plansDir = join(projectPath, 'docs', 'plans');
   const files = await readdir(plansDir);
-  const mds = files.filter((f) => f.endsWith('.md'));
-  if (mds.length === 0) throw new Error(`no plan markdown found in ${plansDir}`);
+  const plans = files.filter((f) => f.endsWith('.html') || f.endsWith('.md'));
+  if (plans.length === 0) throw new Error(`no plan doc (.html/.md) found in ${plansDir}`);
   const stats = await Promise.all(
-    mds.map(async (f) => ({ name: f, mtime: (await stat(join(plansDir, f))).mtimeMs }))
+    plans.map(async (f) => ({ name: f, mtime: (await stat(join(plansDir, f))).mtimeMs }))
   );
   stats.sort((a, b) => b.mtime - a.mtime);
   return join(plansDir, stats[0].name);
