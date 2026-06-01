@@ -97,10 +97,18 @@ export class MulticaClient {
     return issue;
   }
 
+  /**
+   * POST /api/issues/{id}/comments — multica's Go API expects `content` (NOT
+   * `body`); sending `body` returns 400 `{"error":"content is required"}`.
+   * Same field-name trap as createIssue's `description`. Confirmed live
+   * 2026-06-01 (surfaced via plan_upgrade/session_handoff e2e; the unit mocks
+   * never exercised the wire shape). Affects all comment callers
+   * (plan_upgrade, session_handoff, plan_request_review, betting_table_capture).
+   */
   commentOnIssue(issueId: string, body: string): Promise<{ id: string }> {
     return this.req(`/api/issues/${issueId}/comments`, {
       method: 'POST',
-      body: { body },
+      body: { content: body },
     });
   }
 

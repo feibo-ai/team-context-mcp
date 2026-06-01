@@ -154,6 +154,29 @@ describe('MulticaClient', () => {
     await expect(client.removeLabel('iss1', 'no-such-label')).resolves.toBeUndefined();
   });
 
+  it('commentOnIssue posts `content` (not `body`) — backend rejects `body` with 400', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    let sent: Record<string, unknown> = {};
+    pool
+      .intercept({ path: '/api/issues/iss1/comments', method: 'POST' })
+      .reply(201, (opts: { body?: string }) => {
+        sent = JSON.parse(opts.body ?? '{}');
+        return { id: 'cmt1' };
+      });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+    });
+    const r = await client.commentOnIssue('iss1', 'hello world');
+
+    expect(r.id).toBe('cmt1');
+    // backend wants `content`; `body` returns 400 "content is required"
+    expect(sent.content).toBe('hello world');
+    expect(sent.body).toBeUndefined();
+  });
+
   it('updateIssue PUTs snake_case fields (parent_issue_id / project_id)', async () => {
     const pool = mockAgent.get('http://multica.test');
     let method = '';
