@@ -9,7 +9,7 @@ function spyClient() {
   return {
     createIssue: vi.fn(async () => ({ id: 'c1' })),
     updateIssue: vi.fn(async () => ({})),
-    uploadFile: vi.fn().mockResolvedValue({ id: 'att-1' }),
+    uploadFile: vi.fn().mockResolvedValue({ id: 'att-1', url: '/uploads/ws/att-1.html' }),
   } as unknown as MulticaClient;
 }
 
@@ -59,8 +59,14 @@ describe('case_create', () => {
     expect(content).toContain('<h2>5 · 规则候选</h2>');
     // goal contains "<400ms" — esc() turns < into &lt; in the HTML output.
     expect(content).toContain('Reduce p99 to &lt;400ms');
-    // No planIssueId provided → no parent link set.
-    expect(client.updateIssue).not.toHaveBeenCalled();
+    // No planIssueId provided → no parent link set (no updateIssue carries parentIssueId).
+    expect((client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.parentIssueId)).toBeUndefined();
+    // But the doc IS embedded into the description (!file token) + bound via
+    // attachmentIds after a successful upload (with url), so it renders inline.
+    const embedArg = (client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.description?.includes('!file['))?.[1];
+    expect(embedArg).toBeDefined();
+    expect(embedArg.description).toContain('!file[');
+    expect(embedArg.attachmentIds).toContain('att-1');
   });
 
   it('links case → plan via parent_issue_id when planIssueId given', async () => {

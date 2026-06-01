@@ -65,8 +65,9 @@ describe('session_handoff', () => {
 
   it('backward compat — no planInput → posts comment, never uploads', async () => {
     const commentOnIssue = vi.fn().mockResolvedValue({ id: 'cmt-1' });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-h' });
-    const client = { commentOnIssue, uploadFile } as unknown as MulticaClient;
+    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-h', url: '/uploads/ws/att-h.html' });
+    const updateIssue = vi.fn().mockResolvedValue({});
+    const client = { commentOnIssue, uploadFile, updateIssue } as unknown as MulticaClient;
 
     const r = await sessionHandoff(
       {
@@ -82,14 +83,16 @@ describe('session_handoff', () => {
     expect(commentOnIssue).toHaveBeenCalledTimes(1);
     expect(commentOnIssue.mock.calls[0][0]).toBe('issue_h1');
     expect(r.multicaCommentId).toBe('cmt-1');
-    // no planInput → must NOT upload any attachment
+    // no planInput → must NOT upload any attachment (and thus never embed)
     expect(uploadFile).not.toHaveBeenCalled();
+    expect(updateIssue).not.toHaveBeenCalled();
   });
 
   it('regenerates HTML attachment when planInput + multicaIssueId provided', async () => {
     const commentOnIssue = vi.fn().mockResolvedValue({ id: 'cmt-1' });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-h' });
-    const client = { commentOnIssue, uploadFile } as unknown as MulticaClient;
+    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-h', url: '/uploads/ws/att-h.html' });
+    const updateIssue = vi.fn().mockResolvedValue({});
+    const client = { commentOnIssue, uploadFile, updateIssue } as unknown as MulticaClient;
 
     const planHtmlPath = join(dir, 'docs', 'plans', 'plan_2026-05-26_x.html');
     await writeFile(planHtmlPath, '<!DOCTYPE html><html>old</html>', 'utf-8');
@@ -138,6 +141,13 @@ describe('session_handoff', () => {
     expect(onDisk).toContain('当前状态');
     expect(onDisk).toContain('wire bar()');
     expect(onDisk).toContain('You-are-right loop');
+
+    // After a successful upload (with url), the doc is embedded into the issue
+    // description (!file token) + bound via attachmentIds so it renders inline.
+    const embedArg = updateIssue.mock.calls.find((c) => c[1]?.description?.includes('!file['))?.[1];
+    expect(embedArg).toBeDefined();
+    expect(embedArg.description).toContain('!file[');
+    expect(embedArg.attachmentIds).toContain('att-h');
   });
 
   it('does NOT corrupt an .html plan when no planInput (B1 regression)', async () => {

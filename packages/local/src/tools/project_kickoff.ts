@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { fileEmbed } from '@tcmcp/shared';
 import { renderResearchHtml } from '../render/research-html.js';
 import { renderPlanHtml } from '../render/plan-html.js';
 
@@ -81,19 +82,33 @@ export async function projectKickoff(
     projectId: project.id,
   });
 
-  // Upload each HTML doc as an attachment on its issue. Upload failure must NOT
-  // throw — local files + issues are already persisted; attachment is best-effort.
+  // Upload each HTML doc as an attachment on its issue, then embed it in that
+  // issue's description so it renders inline (issue-level binding alone has no
+  // render surface — see fileEmbed). Upload failure must NOT throw — local files
+  // + issues are already persisted; attachment + embed are best-effort.
   let researchAttachmentId: string | null = null;
   let planAttachmentId: string | null = null;
+  const researchFilename = `research_${date}_${input.slug}_v1.html`;
+  const planFilename = `plan_${date}_${input.slug}_v1.html`;
   try {
-    researchAttachmentId = (
-      await deps.client.uploadFile(researchHtml, `research_${date}_${input.slug}_v1.html`, researchIssue.id, 'text/html')
-    ).id;
+    const att = await deps.client.uploadFile(researchHtml, researchFilename, researchIssue.id, 'text/html');
+    researchAttachmentId = att.id;
+    if (att.url) {
+      await deps.client.updateIssue(researchIssue.id, {
+        description: `研究文档(方案A · 下方渲染):\n\n${fileEmbed(researchFilename, att.url)}`,
+        attachmentIds: [att.id],
+      });
+    }
   } catch {}
   try {
-    planAttachmentId = (
-      await deps.client.uploadFile(planHtml, `plan_${date}_${input.slug}_v1.html`, issue.id, 'text/html')
-    ).id;
+    const att = await deps.client.uploadFile(planHtml, planFilename, issue.id, 'text/html');
+    planAttachmentId = att.id;
+    if (att.url) {
+      await deps.client.updateIssue(issue.id, {
+        description: `计划文档(方案A · 下方渲染):\n\n${fileEmbed(planFilename, att.url)}`,
+        attachmentIds: [att.id],
+      });
+    }
   } catch {}
 
   // Broadcast hint: caller LLM should chain to notify_team after this returns.

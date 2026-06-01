@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { GitOps } from '@tcmcp/shared';
 import { upsertSection } from '@tcmcp/shared';
+import { fileEmbed } from '@tcmcp/shared';
 import type { MulticaClient } from '@tcmcp/shared';
 import { renderPlanHtml, type HandoffState } from '../render/plan-html.js';
 import type { PlanCreateInput } from './plan_create.js';
@@ -138,13 +139,22 @@ export async function sessionHandoff(
     // planPath (not input.planPath, which is undefined when auto-discovered),
     // and only when it's actually an .html plan.
     if (isHtml) await writeFile(planPath, html, 'utf-8');
+    const filename = `plan_handoff_${Date.now()}.html`;
     try {
-      await deps.client.uploadFile(
+      const att = await deps.client.uploadFile(
         html,
-        `plan_handoff_${Date.now()}.html`,
+        filename,
         input.multicaIssueId,
         'text/html'
       );
+      // Embed the doc in the issue description so it renders inline in the issue
+      // body (issue-level binding alone has no render surface — see fileEmbed).
+      if (att.url) {
+        await deps.client.updateIssue(input.multicaIssueId, {
+          description: `计划文档(handoff · 方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
+          attachmentIds: [att.id],
+        });
+      }
     } catch {
       /* non-fatal — comment already posted, local file written */
     }

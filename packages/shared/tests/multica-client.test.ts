@@ -3,7 +3,7 @@ import { MockAgent, setGlobalDispatcher, getGlobalDispatcher } from 'undici';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { MulticaClient } from '../src/multica-client.js';
+import { MulticaClient, fileEmbed } from '../src/multica-client.js';
 import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '../src/test-helpers/multica-mock.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -205,5 +205,39 @@ describe('MulticaClient', () => {
     expect(body).toEqual({ status: 'done', parent_issue_id: 'plan1', project_id: 'proj1' });
     expect(body.parentIssueId).toBeUndefined();
     expect(body.projectId).toBeUndefined();
+  });
+
+  it('updateIssue PUTs description + attachment_ids (snake_case) for inline embed', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    let body: Record<string, unknown> = {};
+    pool
+      .intercept({ path: '/api/issues/iss1', method: 'PUT' })
+      .reply(200, (opts: { body?: string }) => {
+        body = JSON.parse(opts.body ?? '{}');
+        return JSON.parse(issueFixture);
+      });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+      labelMap: STANDARD_LABEL_MAP,
+    });
+    await client.updateIssue('iss1', {
+      description: '计划文档:\n\n!file[plan.html](/uploads/ws/att-1.html)',
+      attachmentIds: ['att-1'],
+    });
+
+    // The web UI's inline-render contract: description carries the `!file[..](..)`
+    // token, attachment_ids binds the upload — both snake_case on the wire.
+    expect(body.description).toBe('计划文档:\n\n!file[plan.html](/uploads/ws/att-1.html)');
+    expect(body.attachment_ids).toEqual(['att-1']);
+    expect(body.attachmentIds).toBeUndefined();
+  });
+});
+
+describe('fileEmbed', () => {
+  it('formats a filename + url as the multica !file embed token', () => {
+    expect(fileEmbed('a.html', '/u/x')).toBe('!file[a.html](/u/x)');
   });
 });

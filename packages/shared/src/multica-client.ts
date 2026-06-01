@@ -1,6 +1,20 @@
 import { request, FormData } from 'undici';
 import type { MulticaIssue } from './types.js';
 
+/**
+ * multica file-attachment embed token. Referencing an uploaded attachment's URL
+ * as `!file[name](url)` inside an issue description (or comment) markdown makes
+ * the web editor's file-card extension render it INLINE — for an HTML file that
+ * is the sandboxed HtmlAttachmentPreview. This is exactly what the multica web
+ * UI emits when you drop a file into the description (verified from the browser
+ * upload→PUT round-trip). An attachment bound only at the issue level (issue_id,
+ * no inline reference) has NO render surface and shows nowhere on the page —
+ * which is why doc attachments must be embedded this way to render.
+ */
+export function fileEmbed(filename: string, url: string): string {
+  return `!file[${filename}](${url})`;
+}
+
 export interface MulticaConfig {
   serverUrl: string;
   token: string;
@@ -210,12 +224,24 @@ export class MulticaClient {
    */
   async updateIssue(
     issueId: string,
-    fields: { status?: string; parentIssueId?: string; projectId?: string },
+    fields: {
+      status?: string;
+      parentIssueId?: string;
+      projectId?: string;
+      description?: string;
+      attachmentIds?: string[];
+    },
   ): Promise<MulticaIssue> {
     const body: Record<string, unknown> = {};
     if (fields.status) body.status = fields.status;
     if (fields.parentIssueId) body.parent_issue_id = fields.parentIssueId;
     if (fields.projectId) body.project_id = fields.projectId;
+    // `description` + `attachment_ids` together are how the web UI embeds a
+    // rendered attachment: the description carries an `!file[name](url)` token
+    // (see fileEmbed) and attachment_ids binds the upload to the issue. Allow
+    // empty-string description (clears it), hence the `!== undefined` guard.
+    if (fields.description !== undefined) body.description = fields.description;
+    if (fields.attachmentIds) body.attachment_ids = fields.attachmentIds;
     return this.req<MulticaIssue>(`/api/issues/${issueId}`, {
       method: 'PUT',
       body,

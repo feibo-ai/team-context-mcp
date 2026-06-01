@@ -29,8 +29,10 @@ describe('research_create', () => {
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_1', labels: ['research'] });
 
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-1' });
+    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-1', url: '/uploads/ws/att-1.html' });
     client.uploadFile = uploadFile;
+    const updateIssue = vi.fn().mockResolvedValue({});
+    client.updateIssue = updateIssue;
 
     const r = await researchCreate({
       projectPath: dir,
@@ -52,6 +54,14 @@ describe('research_create', () => {
     expect(issueId).toBe('r_1');
     expect(contentType).toBe('text/html');
     expect(r.attachmentId).toBe('att-1');
+
+    // After a successful upload (with url), the doc is embedded into the issue
+    // description (!file token) + bound via attachmentIds so it renders inline.
+    expect(updateIssue).toHaveBeenCalled();
+    const embedArg = updateIssue.mock.calls.find((c: any[]) => c[1]?.description?.includes('!file['))?.[1];
+    expect(embedArg).toBeDefined();
+    expect(embedArg.description).toContain('!file[');
+    expect(embedArg.attachmentIds).toContain('att-1');
   });
 
   it('returns alreadyExisted=true on second call without rewriting the file', async () => {
@@ -61,7 +71,8 @@ describe('research_create', () => {
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_a', labels: ['research'] }).persist();
 
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
-    client.uploadFile = vi.fn().mockResolvedValue({ id: 'att-1' });
+    client.uploadFile = vi.fn().mockResolvedValue({ id: 'att-1', url: '/uploads/ws/att-1.html' });
+    client.updateIssue = vi.fn().mockResolvedValue({});
     const args = {
       projectPath: dir,
       slug: 'cache-strategy',

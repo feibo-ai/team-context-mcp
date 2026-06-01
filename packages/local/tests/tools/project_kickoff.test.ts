@@ -38,8 +38,10 @@ describe('project_kickoff', () => {
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
     labelMap: STANDARD_LABEL_MAP });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-x' });
+    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-x', url: '/uploads/ws/att-x.html' });
     client.uploadFile = uploadFile;
+    const updateIssue = vi.fn().mockResolvedValue({});
+    client.updateIssue = updateIssue;
 
     const r = await projectKickoff({
       projectPath: dir, slug: 'kickoff-test',
@@ -82,5 +84,16 @@ describe('project_kickoff', () => {
 
     expect(r.researchAttachmentId).toBe('att-x');
     expect(r.planAttachmentId).toBe('att-x');
+
+    // Both docs embedded into their issue's description (!file token) + bound via
+    // attachmentIds after a successful upload (with url), so each renders inline.
+    const researchEmbed = updateIssue.mock.calls.find((c) => c[0] === 'research_k1' && c[1]?.description?.includes('!file['))?.[1];
+    expect(researchEmbed).toBeDefined();
+    expect(researchEmbed.description).toContain('!file[');
+    expect(researchEmbed.attachmentIds).toContain('att-x');
+    const planEmbed = updateIssue.mock.calls.find((c) => c[0] === 'issue_k1' && c[1]?.description?.includes('!file['))?.[1];
+    expect(planEmbed).toBeDefined();
+    expect(planEmbed.description).toContain('!file[');
+    expect(planEmbed.attachmentIds).toContain('att-x');
   });
 });
