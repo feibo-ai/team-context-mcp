@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { GitOps } from '@tcmcp/shared';
 import { upsertSection } from '@tcmcp/shared';
 import type { MulticaClient } from '@tcmcp/shared';
+import { renderPlanHtml } from '../render/plan-html.js';
+import type { PlanCreateInput } from './plan_create.js';
 
 export const sessionHandoffInput = z.object({
   projectPath: z.string(),
@@ -16,9 +18,15 @@ export const sessionHandoffInput = z.object({
   wipMessage: z.string().optional(),
   multicaIssueId: z.string().optional(),
   confirmDiscard: z.boolean().optional(),
+  // Optional: full structured plan. When provided (with multicaIssueId), the
+  // plan HTML is regenerated, the local .html is overwritten, and a NEW
+  // attachment is appended — comment behavior stays unchanged.
+  planInput: z.any().optional(),
 });
 
-export type SessionHandoffInput = z.infer<typeof sessionHandoffInput>;
+export type SessionHandoffInput = Omit<z.infer<typeof sessionHandoffInput>, 'planInput'> & {
+  planInput?: PlanCreateInput;
+};
 
 export interface SessionHandoffOutput {
   planPath: string;
@@ -31,7 +39,7 @@ export async function sessionHandoff(
   raw: SessionHandoffInput,
   deps: { client?: MulticaClient }
 ): Promise<SessionHandoffOutput> {
-  const input = sessionHandoffInput.parse(raw);
+  const input = sessionHandoffInput.parse(raw) as SessionHandoffInput;
   const git = new GitOps(input.projectPath);
 
   const status = await git.status();
@@ -96,11 +104,29 @@ export async function sessionHandoff(
   const updated = upsertSection(planText, '当前状态', block);
   await writeFile(planPath, updated, 'utf-8');
 
-  // Step 5: optional multica comment
+  // Step 5: optional multica comment (existing behavior — unchanged)
   let multicaCommentId: string | undefined;
   if (input.multicaIssueId && deps.client) {
     const comment = await deps.client.commentOnIssue(input.multicaIssueId, block);
     multicaCommentId = comment.id;
+  }
+
+  // Step 6: optional — regenerate plan HTML, overwrite local .html, append as
+  // a NEW attachment. Backward-compatible: only runs when the full structured
+  // plan AND an issue id are provided. Comment behavior above stays untouched.
+  if (input.planInput && input.multicaIssueId && deps.client) {
+    const html = renderPlanHtml(input.planInput);
+    if (input.planPath) await writeFile(input.planPath, html, 'utf-8');
+    try {
+      await deps.client.uploadFile(
+        html,
+        `plan_handoff_${Date.now()}.html`,
+        input.multicaIssueId,
+        'text/html'
+      );
+    } catch {
+      /* non-fatal */
+    }
   }
 
   return { planPath, commitHash, filesCommitted, multicaCommentId };
