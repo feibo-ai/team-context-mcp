@@ -2,6 +2,7 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { fileEmbed } from '@tcmcp/shared';
 import { renderPlanHtml } from '../render/plan-html.js';
 
 export const planCreateInput = z.object({
@@ -63,16 +64,20 @@ export async function planCreate(
     labels: ['计划-草稿'],
   });
 
+  const filename = `plan_${date}_${input.slug}_v1.html`;
   let attachmentId: string | null = null;
   let uploadError: string | undefined;
   try {
-    const att = await deps.client.uploadFile(
-      html,
-      `plan_${date}_${input.slug}_v1.html`,
-      issue.id,
-      'text/html'
-    );
+    const att = await deps.client.uploadFile(html, filename, issue.id, 'text/html');
     attachmentId = att.id;
+    // Embed the doc in the issue description so it renders inline in the issue
+    // body (issue-level binding alone has no render surface — see fileEmbed).
+    if (att.url) {
+      await deps.client.updateIssue(issue.id, {
+        description: `计划文档(方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
+        attachmentIds: [att.id],
+      });
+    }
   } catch (e) {
     uploadError = (e as Error).message;
   }
