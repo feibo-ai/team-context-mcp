@@ -116,6 +116,30 @@ export class MulticaClient {
     });
   }
 
+  /**
+   * DELETE /api/issues/{id}/labels/{labelId} (backend route confirmed via chi
+   * `r.Delete("/labels/{labelId}")`). Idempotent by design so callers can blindly
+   * clear same-family labels: an unknown label name OR a label that isn't
+   * attached (backend 404) is a no-op, not an error. Genuine failures (auth,
+   * 500) still throw.
+   */
+  async removeLabel(issueId: string, labelName: string): Promise<void> {
+    let labelId: string;
+    try {
+      labelId = await this.getLabelId(labelName);
+    } catch {
+      return; // unknown label → nothing to remove
+    }
+    try {
+      await this.req(`/api/issues/${issueId}/labels/${labelId}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      if (String(e).includes('404')) return; // not attached → no-op
+      throw e;
+    }
+  }
+
   private async getLabelId(name: string): Promise<string> {
     if (!this.labelCache) {
       const rows = await this.listLabels();
@@ -135,6 +159,27 @@ export class MulticaClient {
 
   getIssue(issueId: string): Promise<MulticaIssue> {
     return this.req(`/api/issues/${issueId}`);
+  }
+
+  /**
+   * PUT /api/issues/{id} (backend route is chi `r.Put`, NOT PATCH). The handler
+   * pre-fills unsent fields with their current values, so a partial body only
+   * changes what's passed (e.g. {status} won't wipe title/description).
+   * camelCase → snake_case (parent_issue_id / project_id) — multica's Go API
+   * silently drops unknown camelCase keys (same trap as createIssue).
+   */
+  async updateIssue(
+    issueId: string,
+    fields: { status?: string; parentIssueId?: string; projectId?: string },
+  ): Promise<MulticaIssue> {
+    const body: Record<string, unknown> = {};
+    if (fields.status) body.status = fields.status;
+    if (fields.parentIssueId) body.parent_issue_id = fields.parentIssueId;
+    if (fields.projectId) body.project_id = fields.projectId;
+    return this.req<MulticaIssue>(`/api/issues/${issueId}`, {
+      method: 'PUT',
+      body,
+    });
   }
 
   listSkills(): Promise<Array<{ id: string; name: string; bodyTokens?: number; ownerEmail?: string }>> {

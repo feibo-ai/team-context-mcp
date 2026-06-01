@@ -16,7 +16,7 @@ const MIN_SECTION_4_CHARS = 100;
 export async function caseReview(
   raw: z.infer<typeof caseReviewInput>,
   deps: { client: MulticaClient }
-): Promise<{ reviewed: true; reviewedAt: string }> {
+): Promise<{ reviewed: true; reviewedAt: string; closedPlanIssueId?: string }> {
   const input = caseReviewInput.parse(raw);
   const text = await readFile(input.casePath, 'utf-8');
 
@@ -33,7 +33,24 @@ export async function caseReview(
   const updated = upsertSection(text, '4. 关键判断', reviewBlock);
   await writeFile(input.casePath, updated, 'utf-8');
 
+  // State-machine transition: reviewed → drop 复盘-待审 (mutually exclusive) and
+  // mark the case issue done.
   await deps.client.addLabel(input.multicaIssueId, '复盘-已审');
+  await deps.client.removeLabel(input.multicaIssueId, '复盘-待审');
+  await deps.client.updateIssue(input.multicaIssueId, { status: 'done' });
 
-  return { reviewed: true, reviewedAt };
+  // §6 (DRI = auto): a reviewed case closes the whole thread, so also mark the
+  // linked plan issue done. The link is the case issue's parent_issue_id (set by
+  // case_create). No parent → nothing to close.
+  const caseIssue = (await deps.client.getIssue(input.multicaIssueId)) as unknown as Record<
+    string,
+    unknown
+  >;
+  const closedPlanIssueId =
+    (caseIssue.parent_issue_id as string | null | undefined) ?? undefined;
+  if (closedPlanIssueId) {
+    await deps.client.updateIssue(closedPlanIssueId, { status: 'done' });
+  }
+
+  return { reviewed: true, reviewedAt, closedPlanIssueId };
 }

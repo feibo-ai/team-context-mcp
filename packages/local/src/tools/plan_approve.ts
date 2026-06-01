@@ -17,7 +17,12 @@ export async function planApprove(
 ): Promise<{ approvedAt: string }> {
   const input = planApproveInput.parse(raw);
 
+  // State-machine transition: approved → clear the mutually-exclusive draft /
+  // under-review labels and move status to in_progress (entering Implement).
   await deps.client.addLabel(input.multicaIssueId, '计划-已批准');
+  await deps.client.removeLabel(input.multicaIssueId, '计划-草稿');
+  await deps.client.removeLabel(input.multicaIssueId, '计划-评审中');
+  await deps.client.updateIssue(input.multicaIssueId, { status: 'in_progress' });
 
   const original = await readFile(input.planPath, 'utf-8');
   const reviewedAt = new Date().toISOString();

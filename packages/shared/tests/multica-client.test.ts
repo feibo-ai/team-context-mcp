@@ -100,4 +100,87 @@ describe('MulticaClient', () => {
 
     await expect(client.me()).rejects.toThrow(/multica login/i);
   });
+
+  it('removeLabel DELETEs /api/issues/{id}/labels/{labelId} (resolved name→id)', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    let deletedPath = '';
+    pool
+      .intercept({
+        path: (p: string) => p.startsWith('/api/issues/iss1/labels/'),
+        method: 'DELETE',
+      })
+      .reply(200, (opts: { path?: string }) => {
+        deletedPath = opts.path ?? '';
+        return {}; // backend returns 200 + JSON (writeJSON StatusOK), not 204
+      });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+      labelMap: STANDARD_LABEL_MAP,
+    });
+    await client.removeLabel('iss1', '计划-草稿');
+    expect(deletedPath).toBe(`/api/issues/iss1/labels/${STANDARD_LABEL_MAP['计划-草稿']}`);
+  });
+
+  it('removeLabel is idempotent: backend 404 (not attached) does not throw', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    pool
+      .intercept({
+        path: (p: string) => p.startsWith('/api/issues/iss1/labels/'),
+        method: 'DELETE',
+      })
+      .reply(404, { error: 'label not found' });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+      labelMap: STANDARD_LABEL_MAP,
+    });
+    await expect(client.removeLabel('iss1', '计划-草稿')).resolves.toBeUndefined();
+  });
+
+  it('removeLabel is a no-op for an unknown label name (no request made)', async () => {
+    // No DELETE intercept registered — disableNetConnect would throw if a
+    // request were attempted, proving the unknown name short-circuits.
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+      labelMap: STANDARD_LABEL_MAP,
+    });
+    await expect(client.removeLabel('iss1', 'no-such-label')).resolves.toBeUndefined();
+  });
+
+  it('updateIssue PUTs snake_case fields (parent_issue_id / project_id)', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    let method = '';
+    let body: Record<string, unknown> = {};
+    pool
+      .intercept({ path: '/api/issues/iss1', method: 'PUT' })
+      .reply(200, (opts: { method?: string; body?: string }) => {
+        method = opts.method ?? '';
+        body = JSON.parse(opts.body ?? '{}');
+        return JSON.parse(issueFixture);
+      });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+      labelMap: STANDARD_LABEL_MAP,
+    });
+    await client.updateIssue('iss1', {
+      status: 'done',
+      parentIssueId: 'plan1',
+      projectId: 'proj1',
+    });
+
+    expect(method).toBe('PUT');
+    expect(body).toEqual({ status: 'done', parent_issue_id: 'plan1', project_id: 'proj1' });
+    expect(body.parentIssueId).toBeUndefined();
+    expect(body.projectId).toBeUndefined();
+  });
 });
