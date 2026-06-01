@@ -9,7 +9,7 @@ import type { MulticaClient } from '@tcmcp/shared';
 describe('plan_create', () => {
   let dir: string;
   let createIssue: ReturnType<typeof vi.fn>;
-  let uploadFile: ReturnType<typeof vi.fn>;
+  let publishDoc: ReturnType<typeof vi.fn>;
   let client: MulticaClient;
 
   beforeEach(async () => {
@@ -25,8 +25,8 @@ describe('plan_create', () => {
       status: 'open',
       labels: ['plan-draft'],
     });
-    uploadFile = vi.fn().mockResolvedValue({ id: 'att-1' });
-    client = { createIssue, uploadFile } as unknown as MulticaClient;
+    publishDoc = vi.fn().mockResolvedValue({ attachmentId: 'att-1', commentId: 'c1', url: '/uploads/ws/att-1.html' });
+    client = { createIssue, publishDoc } as unknown as MulticaClient;
   });
 
   afterEach(async () => {
@@ -59,12 +59,15 @@ describe('plan_create', () => {
     expect(content).toContain('p99 &lt;400ms over 24h prod');
     expect(content).toContain('alice');
 
-    expect(uploadFile).toHaveBeenCalled();
+    // doc goes to a COMMENT (publishDoc), never the issue description
+    expect(publishDoc).toHaveBeenCalled();
+    expect(publishDoc.mock.calls[0][0]).toBe('issue_p1');
+    expect(publishDoc.mock.calls[0][1].filename).toMatch(/_v1\.html$/);
     expect(result.attachmentId).toBe('att-1');
   });
 
   it('upload failure is non-fatal — issue created + local file written, uploadError surfaced', async () => {
-    uploadFile.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    publishDoc.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
     const result = await planCreate(
       {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @tcmcp/local — stdio MCP server for the 12 local-only SOP workflow tools.
+// @tcmcp/local — stdio MCP server for the 13 local-only SOP workflow tools.
 //
 // Local tools are file-system + git heavy (plan/case/research/skill_lint etc).
 // They run in the developer's checkout where files live; no remote transport.
@@ -23,6 +23,7 @@ import { casePromoteRule, casePromoteRuleInput } from './tools/case_promote_rule
 import { sessionHandoff, sessionHandoffInput } from './tools/session_handoff.js';
 import { projectKickoff, projectKickoffInput } from './tools/project_kickoff.js';
 import { researchCreate, researchCreateInput } from './tools/research_create.js';
+import { docPublish, docPublishInput } from './tools/doc_publish.js';
 import { skillLint, skillLintInput } from './tools/skill_lint.js';
 import { monthlyHealthReport, monthlyHealthReportInput } from './tools/monthly_health_report.js';
 import { autopilotLint, autopilotLintInput } from './tools/autopilot_lint.js';
@@ -97,10 +98,17 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'research_create',
-    description: 'RPI Research phase skeleton + multica 研究 issue.',
+    description: 'RPI Research phase skeleton + multica 研究 issue. Creates the issue + a LOCAL skeleton file only — it does NOT upload a doc (the skeleton has no findings). After you fill the local HTML, publish it with doc_publish (a comment).',
     schema: researchCreateInput,
     handler: (i, d) =>
       researchCreate(i as z.infer<typeof researchCreateInput>, d),
+  },
+  {
+    name: 'doc_publish',
+    description:
+      'Publish a local HTML doc (e.g. filled research findings) to a multica issue as an append-only COMMENT that embeds it via !file (renders inline). Use this to fill a research_create skeleton or post any new doc version. NEVER try to update an attachment (the CLI can only download) or rewrite the issue description.',
+    schema: docPublishInput,
+    handler: (i, d) => docPublish(i as z.infer<typeof docPublishInput>, d),
   },
   {
     name: 'skill_lint',

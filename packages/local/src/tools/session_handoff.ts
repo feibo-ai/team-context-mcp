@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { GitOps } from '@tcmcp/shared';
 import { upsertSection } from '@tcmcp/shared';
-import { fileEmbed } from '@tcmcp/shared';
 import type { MulticaClient } from '@tcmcp/shared';
 import { renderPlanHtml, type HandoffState } from '../render/plan-html.js';
 import type { PlanCreateInput } from './plan_create.js';
@@ -141,22 +140,16 @@ export async function sessionHandoff(
     if (isHtml) await writeFile(planPath, html, 'utf-8');
     const filename = `plan_handoff_${Date.now()}.html`;
     try {
-      const att = await deps.client.uploadFile(
+      // Publish the regenerated plan as a COMMENT (append-only · !file inline
+      // render). The handoff-state comment above (Step 5) stays separate; this
+      // adds the rendered doc. NOT the description (append-only comment model).
+      await deps.client.publishDoc(input.multicaIssueId, {
         html,
         filename,
-        input.multicaIssueId,
-        'text/html'
-      );
-      // Embed the doc in the issue description so it renders inline in the issue
-      // body (issue-level binding alone has no render surface — see fileEmbed).
-      if (att.url) {
-        await deps.client.updateIssue(input.multicaIssueId, {
-          description: `计划文档(handoff · 方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
-          attachmentIds: [att.id],
-        });
-      }
+        caption: `计划文档(handoff @ ${ts} · 方案A · 下方渲染)`,
+      });
     } catch {
-      /* non-fatal — comment already posted, local file written */
+      /* non-fatal — handoff comment already posted, local file written */
     }
   }
 

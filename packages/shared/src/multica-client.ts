@@ -119,11 +119,51 @@ export class MulticaClient {
    * never exercised the wire shape). Affects all comment callers
    * (plan_upgrade, session_handoff, plan_request_review, betting_table_capture).
    */
-  commentOnIssue(issueId: string, body: string): Promise<{ id: string }> {
+  commentOnIssue(
+    issueId: string,
+    body: string,
+    attachmentIds?: string[]
+  ): Promise<{ id: string }> {
     return this.req(`/api/issues/${issueId}/comments`, {
       method: 'POST',
-      body: { content: body },
+      body: {
+        content: body,
+        // Comments bind attachments via snake_case attachment_ids (backend
+        // comment_attachment_integration_test.go). Binding makes a comment's
+        // !file embed own the upload so the web UI's AttachmentList dedups it
+        // (content.includes(url)) instead of double-showing a standalone card.
+        ...(attachmentIds && attachmentIds.length
+          ? { attachment_ids: attachmentIds }
+          : {}),
+      },
     });
+  }
+
+  /**
+   * Append-only doc publish: upload the rendered HTML, then post a COMMENT whose
+   * body embeds it via `!file[name](url)` and whose attachment_ids bind the
+   * upload. The doc renders INLINE in the comment (ReadonlyContent →
+   * preprocessFileCards → file-card extension → HtmlAttachmentPreview), exactly
+   * like the issue description — but append-only: every version is a new comment,
+   * the original attachment is never mutated (the CLI can't re-upload anyway),
+   * and the issue description is never rewritten. This is the single mechanism
+   * behind research/plan/case publish and every subsequent version.
+   */
+  async publishDoc(
+    issueId: string,
+    opts: { html: string; filename: string; caption: string; contentType?: string }
+  ): Promise<{ attachmentId: string; commentId: string; url?: string }> {
+    const att = await this.uploadFile(
+      opts.html,
+      opts.filename,
+      issueId,
+      opts.contentType ?? 'text/html'
+    );
+    const body = att.url
+      ? `${opts.caption}\n\n${fileEmbed(opts.filename, att.url)}`
+      : `${opts.caption}\n\n(⚠️ 附件已上传 id=${att.id},但响应无 url,无法内联渲染)`;
+    const comment = await this.commentOnIssue(issueId, body, [att.id]);
+    return { attachmentId: att.id, commentId: comment.id, url: att.url };
   }
 
   /**

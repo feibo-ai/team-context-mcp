@@ -1,7 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
-import { fileEmbed } from '@tcmcp/shared';
 import { renderPlanHtml } from '../render/plan-html.js';
 import type { PlanCreateInput } from './plan_create.js';
 
@@ -55,33 +54,26 @@ export async function planUpgrade(
     // current HTML, never markdown/frontmatter.
     await writeFile(input.planPath, html, 'utf-8');
     try {
-      const att = await deps.client.uploadFile(
+      // Publish v{version} as a COMMENT (append-only · !file inline render).
+      // ONE call uploads + comments + binds — replaces the old description
+      // rewrite + separate text comment, which duplicated content and left the
+      // description diverging from the attachment. The reason rides in caption.
+      const pub = await deps.client.publishDoc(input.multicaIssueId, {
         html,
-        `plan_v${version}.html`,
-        input.multicaIssueId,
-        'text/html'
-      );
-      attachmentId = att.id;
-      // Embed the doc in the issue description so it renders inline in the issue
-      // body (issue-level binding alone has no render surface — see fileEmbed).
-      if (att.url) {
-        await deps.client.updateIssue(input.multicaIssueId, {
-          description: `计划文档 v${version}(方案A · 下方渲染):\n\n${fileEmbed(`plan_v${version}.html`, att.url)}`,
-          attachmentIds: [att.id],
-        });
-      }
+        filename: `plan_v${version}.html`,
+        caption: `计划已升级到 v${version}(原因:${input.reason}) · 新 HTML 已发布`,
+      });
+      attachmentId = pub.attachmentId;
     } catch (e) {
-      // Upload failure is non-fatal — the label/status transition already
-      // landed and the local HTML is written; surface the error to the caller.
+      // Publish failure is non-fatal — the label/status transition already
+      // landed and the local HTML is written. Still leave a comment recording
+      // the upgrade so the issue reflects the bump; surface the error.
       uploadError = (e as Error).message;
+      await deps.client.commentOnIssue(
+        input.multicaIssueId,
+        `计划已升级到 v${version}(原因:${input.reason})(⚠️ 附件发布失败:${uploadError} · 本地 HTML 已更新,可重试 doc_publish)`
+      );
     }
-    const note = uploadError
-      ? `(⚠️ 附件上传失败:${uploadError} · 本地 HTML 已更新,可手动重传)`
-      : ' · 新 HTML 附件已上传';
-    await deps.client.commentOnIssue(
-      input.multicaIssueId,
-      `计划已升级到 v${version}(原因:${input.reason})${note}`
-    );
   }
 
   return { version, attachmentId, uploadError };

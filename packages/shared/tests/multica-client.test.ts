@@ -177,6 +177,66 @@ describe('MulticaClient', () => {
     expect(sent.body).toBeUndefined();
   });
 
+  it('commentOnIssue passes attachment_ids (snake_case) when given, omits when not', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    let sent: Record<string, unknown> = {};
+    pool
+      .intercept({ path: '/api/issues/iss1/comments', method: 'POST' })
+      .reply(201, (opts: { body?: string }) => {
+        sent = JSON.parse(opts.body ?? '{}');
+        return { id: 'cmt2' };
+      });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+    });
+    await client.commentOnIssue('iss1', 'see doc', ['att-1', 'att-2']);
+
+    // The comment API binds attachments via snake_case attachment_ids (backend
+    // comment_attachment_integration_test.go) — this is what lets a comment's
+    // !file embed dedup against AttachmentList and own the attachment lifecycle.
+    expect(sent.content).toBe('see doc');
+    expect(sent.attachment_ids).toEqual(['att-1', 'att-2']);
+  });
+
+  it('publishDoc uploads the html then comments with the !file embed + attachment_ids', async () => {
+    const pool = mockAgent.get('http://multica.test');
+    pool
+      .intercept({ path: '/api/upload-file', method: 'POST' })
+      .reply(201, { id: 'att-9', url: '/uploads/ws/att-9.html' });
+    let sent: Record<string, unknown> = {};
+    pool
+      .intercept({ path: '/api/issues/iss1/comments', method: 'POST' })
+      .reply(201, (opts: { body?: string }) => {
+        sent = JSON.parse(opts.body ?? '{}');
+        return { id: 'cmt9' };
+      });
+
+    const client = new MulticaClient({
+      serverUrl: 'http://multica.test',
+      token: 't',
+      workspaceId: 'w',
+    });
+    const r = await client.publishDoc('iss1', {
+      html: '<!doctype html><html><body>x</body></html>',
+      filename: 'research_2026-06-01_x_v1.html',
+      caption: '研究文档 v1(方案A · 下方渲染)',
+    });
+
+    // Append-only doc model: upload → comment-embed. The doc renders INLINE in
+    // the comment (ReadonlyContent → preprocessFileCards → file-card), and the
+    // attachment binds to the comment so AttachmentList won't double-show it.
+    expect(r.attachmentId).toBe('att-9');
+    expect(r.commentId).toBe('cmt9');
+    expect(r.url).toBe('/uploads/ws/att-9.html');
+    expect(sent.content).toBe(
+      '研究文档 v1(方案A · 下方渲染)\n\n!file[research_2026-06-01_x_v1.html](/uploads/ws/att-9.html)'
+    );
+    expect(sent.attachment_ids).toEqual(['att-9']);
+  });
+
   it('updateIssue PUTs snake_case fields (parent_issue_id / project_id)', async () => {
     const pool = mockAgent.get('http://multica.test');
     let method = '';
