@@ -23,6 +23,9 @@ export const caseCreateInput = z.object({
   })).min(1),
   ruleCandidates: z.array(z.string()).max(3).default([]),
   multicaProjectId: z.string().optional(),
+  // Original plan issue id — when present, the case issue is linked to it via
+  // parent_issue_id so case_review can traverse up and auto-close the plan.
+  planIssueId: z.string().optional(),
 });
 
 export type CaseCreateInput = z.infer<typeof caseCreateInput>;
@@ -60,6 +63,13 @@ export async function caseCreate(
     labels: ['复盘-待审'],
     projectId: input.multicaProjectId,
   });
+
+  // 修D · structured link back to the plan issue. createIssue has no parent
+  // param, so set parent_issue_id via updateIssue — this is what lets
+  // case_review traverse up and auto-close the plan when the case is approved.
+  if (input.planIssueId) {
+    await deps.client.updateIssue(issue.id, { parentIssueId: input.planIssueId });
+  }
 
   return { casePath, multicaIssueId: issue.id };
 }

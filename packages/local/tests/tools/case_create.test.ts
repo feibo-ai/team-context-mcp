@@ -1,40 +1,37 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MockAgent, setGlobalDispatcher } from 'undici';
 import { caseCreate } from '../../src/tools/case_create.js';
-import { MulticaClient } from '@tcmcp/shared';
-import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '@tcmcp/shared/test-helpers';
+import type { MulticaClient } from '@tcmcp/shared';
+
+function spyClient() {
+  return {
+    createIssue: vi.fn(async () => ({ id: 'c1' })),
+    updateIssue: vi.fn(async () => ({})),
+  } as unknown as MulticaClient;
+}
+
+const baseJudgment = {
+  title: 'Cache key strategy',
+  context: 'old key triggered storms',
+  options: ['A', 'B'],
+  chose: 'A — fewer collisions',
+  inHindsight: 'right call',
+  ancientImpossible: 'No, would have done same pre-AI',
+};
 
 describe('case_create', () => {
   let dir: string;
-  let agent: MockAgent;
-
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'case-'));
-    agent = new MockAgent();
-    agent.disableNetConnect();
-    setGlobalDispatcher(agent);
   });
-
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
-    await agent.close();
   });
 
-  it('writes case file with all 5 sections', async () => {
-    const pool = agent.get('http://m.test');
-    pool.intercept({ path: '/api/issues', method: 'POST' })
-      .reply(201, { id: 'c1', title: 'Debrief', status: 'open', labels: ['debrief'] });
-    interceptAnyLabelAdd(pool);
-
-    const client = new MulticaClient({
-      serverUrl: 'http://m.test',
-      token: 't',
-      workspaceId: 'w',
-    labelMap: STANDARD_LABEL_MAP });
-
+  it('writes case file with all 5 sections + creates the 复盘 issue', async () => {
+    const client = spyClient();
     const r = await caseCreate(
       {
         projectPath: dir,
@@ -42,71 +39,62 @@ describe('case_create', () => {
         goal: 'Reduce p99 to <400ms',
         whatHappened: 'Tried cache tuning. Worked.',
         criteriaResults: [{ criterion: 'p99 <400ms 24h', met: true }],
-        keyJudgments: [
-          {
-            title: 'Cache key strategy',
-            context: 'old key triggered storms',
-            options: ['A', 'B'],
-            chose: 'A — fewer collisions',
-            inHindsight: 'right call',
-            ancientImpossible: 'No, would have done same pre-AI',
-          },
-        ],
+        keyJudgments: [baseJudgment],
         ruleCandidates: ['Always check cache key collision in load test'],
       },
-      { client }
+      { client },
     );
 
     expect(r.casePath).toMatch(/cases\/\d{4}-\d{2}-\d{2}-feed-latency\.md/);
+    expect(r.multicaIssueId).toBe('c1');
+    expect(client.createIssue).toHaveBeenCalled();
     const content = await readFile(r.casePath, 'utf-8');
     expect(content).toContain('## 1. 目标');
     expect(content).toContain('## 2. 实际发生了什么');
     expect(content).toContain('## 3. 完成标准');
     expect(content).toContain('## 4. 关键判断');
     expect(content).toContain('## 5. 通用规则候选');
+    // No planIssueId provided → no parent link set.
+    expect(client.updateIssue).not.toHaveBeenCalled();
+  });
+
+  it('links case → plan via parent_issue_id when planIssueId given', async () => {
+    const client = spyClient();
+    await caseCreate(
+      {
+        projectPath: dir,
+        slug: 'linked',
+        goal: 'g',
+        whatHappened: 'w',
+        criteriaResults: [{ criterion: 'c', met: true }],
+        keyJudgments: [baseJudgment],
+        ruleCandidates: [],
+        planIssueId: 'plan_99',
+      },
+      { client },
+    );
+    expect(client.updateIssue).toHaveBeenCalledWith('c1', { parentIssueId: 'plan_99' });
   });
 
   it('refuses to overwrite an existing case file', async () => {
-    const pool = agent.get('http://m.test');
-    pool.intercept({ path: '/api/issues', method: 'POST' })
-      .reply(201, { id: 'c1', title: 'Debrief', status: 'open', labels: ['debrief'] })
-      .persist(); // allow first call's createIssue; second call shouldn't reach this
-    interceptAnyLabelAdd(pool);
-
-    const client = new MulticaClient({
-      serverUrl: 'http://m.test',
-      token: 't',
-      workspaceId: 'w',
-    labelMap: STANDARD_LABEL_MAP });
-
+    const client = spyClient();
     const args = {
       projectPath: dir,
       slug: 'feed-latency',
-      goal: 'Reduce p99 to <400ms',
+      goal: 'g',
       whatHappened: 'first run',
-      criteriaResults: [{ criterion: 'p99 <400ms 24h', met: true }],
-      keyJudgments: [{
-        title: 'Cache key',
-        context: 'collisions',
-        options: ['A', 'B'],
-        chose: 'A',
-        inHindsight: 'right call',
-        ancientImpossible: 'No',
-      }],
-      ruleCandidates: [],
+      criteriaResults: [{ criterion: 'c', met: true }],
+      keyJudgments: [baseJudgment],
+      ruleCandidates: [] as string[],
     };
 
-    // First call writes the case file.
     const first = await caseCreate(args, { client });
-    const firstContent = await readFile(first.casePath, 'utf-8');
-    expect(firstContent).toContain('first run');
+    expect(await readFile(first.casePath, 'utf-8')).toContain('first run');
 
-    // Second call with identical slug + same day → should throw, not silently overwrite.
     await expect(
-      caseCreate({ ...args, whatHappened: 'second run — should NOT overwrite' }, { client })
+      caseCreate({ ...args, whatHappened: 'second run — should NOT overwrite' }, { client }),
     ).rejects.toThrow(/already exists/);
 
-    // File on disk must still be the first version (no silent overwrite).
     const after = await readFile(first.casePath, 'utf-8');
     expect(after).toContain('first run');
     expect(after).not.toContain('second run');
