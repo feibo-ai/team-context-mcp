@@ -9,6 +9,7 @@ function spyClient() {
   return {
     createIssue: vi.fn(async () => ({ id: 'c1' })),
     updateIssue: vi.fn(async () => ({})),
+    uploadFile: vi.fn().mockResolvedValue({ id: 'att-1' }),
   } as unknown as MulticaClient;
 }
 
@@ -45,15 +46,19 @@ describe('case_create', () => {
       { client },
     );
 
-    expect(r.casePath).toMatch(/cases\/\d{4}-\d{2}-\d{2}-feed-latency\.md/);
+    expect(r.casePath).toMatch(/cases\/\d{4}-\d{2}-\d{2}-feed-latency\.html$/);
     expect(r.multicaIssueId).toBe('c1');
+    expect(r.attachmentId).toBe('att-1');
     expect(client.createIssue).toHaveBeenCalled();
+    expect(client.uploadFile).toHaveBeenCalled();
     const content = await readFile(r.casePath, 'utf-8');
-    expect(content).toContain('## 1. 目标');
-    expect(content).toContain('## 2. 实际发生了什么');
-    expect(content).toContain('## 3. 完成标准');
-    expect(content).toContain('## 4. 关键判断');
-    expect(content).toContain('## 5. 通用规则候选');
+    expect(content).toContain('<h2>1 · 目标</h2>');
+    expect(content).toContain('<h2>2 · 实际发生</h2>');
+    expect(content).toContain('<h2>3 · 完成标准</h2>');
+    expect(content).toContain('<h2>4 · 关键判断</h2>');
+    expect(content).toContain('<h2>5 · 规则候选</h2>');
+    // goal contains "<400ms" — esc() turns < into &lt; in the HTML output.
+    expect(content).toContain('Reduce p99 to &lt;400ms');
     // No planIssueId provided → no parent link set.
     expect(client.updateIssue).not.toHaveBeenCalled();
   });
