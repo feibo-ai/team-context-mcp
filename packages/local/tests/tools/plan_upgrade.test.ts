@@ -10,6 +10,8 @@ function spyClient() {
     addLabel: vi.fn(async () => {}),
     removeLabel: vi.fn(async () => {}),
     updateIssue: vi.fn(async () => ({})),
+    uploadFile: vi.fn().mockResolvedValue({ id: 'att-2' }),
+    commentOnIssue: vi.fn().mockResolvedValue({ id: 'c1' }),
   } as unknown as MulticaClient;
 }
 
@@ -22,33 +24,114 @@ describe('plan_upgrade', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it('bumps version + snapshots, clears 计划-已批准, adds 计划-已升级/计划-草稿, status in_review', async () => {
-    const planPath = join(dir, 'plan_x.md');
-    await writeFile(
-      planPath,
-      ['---', 'version: 1.0', '---', '# Plan: x', '', '## Goal', 'do x'].join('\n'),
-    );
+  it('no planInput → label/status transition only (degraded), no upload/comment', async () => {
     const client = spyClient();
 
     const r = await planUpgrade(
-      { planPath, multicaIssueId: 'issue_p1', reason: 'realized X was wrong, need to redo Y' },
+      {
+        planPath: join(dir, 'plan_x.html'),
+        multicaIssueId: 'issue_p1',
+        reason: 'realized X was wrong, need to redo Y',
+      },
       { client },
     );
 
-    expect(r.newVersion).toBe('1.1');
-    expect(r.snapshotPath).toMatch(/plan_x_v1\.0\.md$/);
+    // Degraded: no attachment, no HTML regeneration, no comment.
+    expect(r.attachmentId).toBeNull();
+    expect(client.uploadFile).not.toHaveBeenCalled();
+    expect(client.commentOnIssue).not.toHaveBeenCalled();
 
-    const updated = await readFile(planPath, 'utf-8');
-    expect(updated).toMatch(/version: 1\.1/);
-    expect(updated).toContain('## 升级日志');
-    expect(updated).toContain('1.0 → 1.1');
-    expect(updated).toContain('realized X was wrong');
-    expect(await readdir(dir)).toContain('plan_x_v1.0.md');
-
-    // State machine: upgrade clears approved, marks upgraded + draft, → in_review.
+    // State machine still runs: clears approved, marks upgraded + draft, → in_review.
     expect(client.removeLabel).toHaveBeenCalledWith('issue_p1', '计划-已批准');
     expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-已升级');
     expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-草稿');
     expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
+  });
+
+  it('planInput → regenerates HTML, uploads single-version attachment, overwrites local, comments', async () => {
+    const planPath = join(dir, 'plan_x.html');
+    await writeFile(planPath, '<!DOCTYPE html><html>old v1</html>');
+    const client = spyClient();
+
+    const r = await planUpgrade(
+      {
+        planPath,
+        multicaIssueId: 'issue_p1',
+        reason: 'realized X was wrong, need to redo Y',
+        version: 2,
+        planInput: {
+          projectPath: dir,
+          slug: 'feed-latency',
+          layer: 'project',
+          dri: 'alice',
+          goal: 'Reduce p99 to <300ms',
+          completionCriteria: ['p99 <300ms over 24h prod'],
+          appetite: '1 week',
+        },
+      },
+      { client },
+    );
+
+    // Single coherent version used everywhere (no disjoint 1.1-vs-2 scheme).
+    expect(r.version).toBe(2);
+    expect(r.attachmentId).toBe('att-2');
+
+    // Local HTML file overwritten with freshly regenerated plan (escaped).
+    const updated = await readFile(planPath, 'utf-8');
+    expect(updated).toContain('<!DOCTYPE html>');
+    expect(updated).toContain('Reduce p99 to &lt;300ms');
+    expect(updated).not.toContain('old v1');
+
+    // New versioned attachment uploaded (append, never delete) + associated.
+    const upCall = (client.uploadFile as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(upCall[1]).toBe('plan_v2.html');
+    expect(upCall[2]).toBe('issue_p1');
+
+    // Comment documents the upgrade.
+    expect(client.commentOnIssue).toHaveBeenCalled();
+    expect((client.commentOnIssue as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('issue_p1');
+
+    // NO local markdown snapshot is created (versions live on the issue only).
+    const files = await readdir(dir);
+    expect(files.filter((f) => f.endsWith('.md'))).toHaveLength(0);
+
+    // Existing label/status flow must still run.
+    expect(client.removeLabel).toHaveBeenCalledWith('issue_p1', '计划-已批准');
+    expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-已升级');
+    expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
+  });
+
+  it('upload failure is non-fatal — labels/status land, comment notes the failure', async () => {
+    const planPath = join(dir, 'plan_x.html');
+    await writeFile(planPath, '<!DOCTYPE html><html>old</html>');
+    const client = spyClient();
+    (client.uploadFile as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    const r = await planUpgrade(
+      {
+        planPath,
+        multicaIssueId: 'issue_p1',
+        reason: 'realized X was wrong, need to redo Y',
+        version: 3,
+        planInput: {
+          projectPath: dir,
+          slug: 'feed-latency',
+          layer: 'project',
+          goal: 'Reduce p99 to <300ms',
+          completionCriteria: ['p99 <300ms'],
+        },
+      },
+      { client },
+    );
+
+    expect(r.attachmentId).toBeNull();
+    expect(r.uploadError).toMatch(/ECONNREFUSED/);
+    // local HTML still overwritten despite upload failure
+    expect(await readFile(planPath, 'utf-8')).toContain('<!DOCTYPE html>');
+    // label/status transition still landed
+    expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
+    // comment still posted, flagging the upload failure
+    const note = (client.commentOnIssue as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(note).toMatch(/上传失败/);
   });
 });

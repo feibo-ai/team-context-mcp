@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import simpleGit from 'simple-git';
-import { MockAgent, setGlobalDispatcher } from 'undici';
 import { planCreate } from '../../src/tools/plan_create.js';
-import { MulticaClient } from '@tcmcp/shared';
-import { STANDARD_LABEL_MAP, interceptAnyLabelAdd } from '@tcmcp/shared/test-helpers';
+import type { MulticaClient } from '@tcmcp/shared';
 
 describe('plan_create', () => {
   let dir: string;
-  let agent: MockAgent;
+  let createIssue: ReturnType<typeof vi.fn>;
+  let uploadFile: ReturnType<typeof vi.fn>;
+  let client: MulticaClient;
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'plan-'));
@@ -19,30 +19,21 @@ describe('plan_create', () => {
     await g.addConfig('user.email', 'test@x');
     await g.addConfig('user.name', 'Test');
 
-    agent = new MockAgent();
-    agent.disableNetConnect();
-    setGlobalDispatcher(agent);
-    const pool = agent.get('http://m.test');
-    pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, {
+    createIssue = vi.fn().mockResolvedValue({
       id: 'issue_p1',
       title: 'Plan: feed-latency',
       status: 'open',
       labels: ['plan-draft'],
     });
-    interceptAnyLabelAdd(pool);
+    uploadFile = vi.fn().mockResolvedValue({ id: 'att-1' });
+    client = { createIssue, uploadFile } as unknown as MulticaClient;
   });
 
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
-    await agent.close();
   });
 
   it('writes plan file and creates multica issue', async () => {
-    const client = new MulticaClient({
-      serverUrl: 'http://m.test',
-      token: 't',
-      workspaceId: 'w',
-    labelMap: STANDARD_LABEL_MAP });
     const result = await planCreate(
       {
         projectPath: dir,
@@ -56,12 +47,63 @@ describe('plan_create', () => {
       { client }
     );
 
-    expect(result.planPath).toMatch(/docs\/plans\/plan_\d{4}-\d{2}-\d{2}_feed-latency\.md/);
+    expect(result.planPath).toMatch(/docs\/plans\/plan_\d{4}-\d{2}-\d{2}_.*\.html$/);
     expect(result.multicaIssueId).toBe('issue_p1');
+    expect(createIssue).toHaveBeenCalled();
+    expect(createIssue.mock.calls[0][0].labels).toContain('计划-草稿');
 
     const content = await readFile(result.planPath, 'utf-8');
-    expect(content).toContain('## 目标\nReduce p99 to <400ms');
-    expect(content).toContain('p99 <400ms over 24h prod');
-    expect(content).toContain('**DRI:** alice');
+    expect(content).toContain('<!DOCTYPE html>');
+    // renderPlanHtml HTML-escapes content, so `<` becomes `&lt;`
+    expect(content).toContain('Reduce p99 to &lt;400ms');
+    expect(content).toContain('p99 &lt;400ms over 24h prod');
+    expect(content).toContain('alice');
+
+    expect(uploadFile).toHaveBeenCalled();
+    expect(result.attachmentId).toBe('att-1');
+  });
+
+  it('upload failure is non-fatal — issue created + local file written, uploadError surfaced', async () => {
+    uploadFile.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    const result = await planCreate(
+      {
+        projectPath: dir,
+        slug: 'feed-latency',
+        layer: 'project',
+        dri: 'alice',
+        goal: 'Reduce p99 to <400ms',
+        completionCriteria: ['p99 <400ms over 24h prod'],
+        appetite: '1 week',
+      },
+      { client }
+    );
+
+    // issue still created, no rollback
+    expect(result.multicaIssueId).toBe('issue_p1');
+    // upload failed → null attachment + surfaced error (§4c contract)
+    expect(result.attachmentId).toBeNull();
+    expect(result.uploadError).toMatch(/ECONNREFUSED/);
+    // local HTML still written despite the upload failure
+    const content = await readFile(result.planPath, 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+  });
+
+  it('is idempotent — second call reuses existing plan file', async () => {
+    const args = {
+      projectPath: dir,
+      slug: 'feed-latency',
+      layer: 'project' as const,
+      dri: 'alice',
+      goal: 'Reduce p99 to <400ms',
+      completionCriteria: ['p99 <400ms over 24h prod'],
+      appetite: '1 week',
+    };
+    const first = await planCreate(args, { client });
+    expect(first.alreadyExisted).toBe(false);
+
+    const second = await planCreate(args, { client });
+    expect(second.alreadyExisted).toBe(true);
+    expect(second.planPath).toBe(first.planPath);
   });
 });

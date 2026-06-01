@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { renderResearchHtml } from '../render/research-html.js';
+import { renderPlanHtml } from '../render/plan-html.js';
 
 export const projectKickoffInput = z.object({
   projectPath: z.string(),
@@ -18,6 +20,8 @@ export async function projectKickoff(
 ): Promise<{
   researchPath: string;
   planPath: string;
+  researchAttachmentId: string | null;
+  planAttachmentId: string | null;
   multicaProjectId: string;
   multicaResearchIssueId: string;
   multicaIssueId: string;
@@ -29,77 +33,23 @@ export async function projectKickoff(
   const input = projectKickoffInput.parse(raw);
   const date = new Date().toISOString().slice(0, 10);
 
-  const researchPath = join(input.projectPath, 'docs', 'research', `research_${date}_${input.slug}.md`);
-  const planPath = join(input.projectPath, 'docs', 'plans', `plan_${date}_${input.slug}.md`);
+  const researchPath = join(input.projectPath, 'docs', 'research', `research_${date}_${input.slug}.html`);
+  const planPath = join(input.projectPath, 'docs', 'plans', `plan_${date}_${input.slug}.html`);
 
   await mkdir(dirname(researchPath), { recursive: true });
   await mkdir(dirname(planPath), { recursive: true });
 
-  await writeFile(researchPath, `# 研究:${input.topic}
+  const researchHtml = renderResearchHtml({ slug: input.slug, question: input.topic } as any);
+  const planHtml = renderPlanHtml({
+    slug: input.slug,
+    layer: 'project',
+    dri: input.dri,
+    goal: input.goalDraft,
+    completionCriteria: [],
+  } as any);
 
-## 问题
-<一段话:我们想搞清楚什么>
-
-## 发现
-### 现有代码
-- TBD
-
-### 先例
-- TBD
-
-### 陷阱
-- TBD
-
-### 约束
-- TBD
-
-## 待解问题
-- TBD
-
-## 推荐方案
-1. TBD
-`);
-
-  await writeFile(planPath, `---
-version: 1.0
-layer: project
-dri: ${input.dri}
----
-# 计划:${input.slug}
-
-**创建:** ${date}
-**DRI:** ${input.dri}
-**层级:** project
-
-## 目标
-${input.goalDraft}
-
-## 完成标准
-- [ ] TBD (DRI 在 Research 后填写)
-
-## 分工
-- DRI: ${input.dri}
-- EXEC: _(invoke role-assignment-protocol skill)_
-- COLLAB: _(invoke role-assignment-protocol skill)_
-- REVIEW: _(assign before Implement phase)_
-
-## 投入预算
-${input.appetite}
-
-## 研究输入
-${researchPath.replace(input.projectPath + '/', '')}
-
-## 方案
-_(Research 后填写)_
-
-## 评审
-- Reviewer: _(pending)_
-- Reviewed: _(pending)_
-- Verdict: pending
-
-## 当前状态(交接槽 · 见 pre-clear skill)
-_(首次交接前为空)_
-`);
+  await writeFile(researchPath, researchHtml);
+  await writeFile(planPath, planHtml);
 
   // Create multica project
   const project = await (deps.client as any).req('/api/projects', {
@@ -131,6 +81,21 @@ _(首次交接前为空)_
     projectId: project.id,
   });
 
+  // Upload each HTML doc as an attachment on its issue. Upload failure must NOT
+  // throw — local files + issues are already persisted; attachment is best-effort.
+  let researchAttachmentId: string | null = null;
+  let planAttachmentId: string | null = null;
+  try {
+    researchAttachmentId = (
+      await deps.client.uploadFile(researchHtml, `research_${date}_${input.slug}_v1.html`, researchIssue.id, 'text/html')
+    ).id;
+  } catch {}
+  try {
+    planAttachmentId = (
+      await deps.client.uploadFile(planHtml, `plan_${date}_${input.slug}_v1.html`, issue.id, 'text/html')
+    ).id;
+  } catch {}
+
   // Broadcast hint: caller LLM should chain to notify_team after this returns.
   // SOP Phase 01 Step 6 announce — handled by orchestrator, not inline shell-out.
   const goalSnippet = input.goalDraft.length > 100
@@ -139,6 +104,8 @@ _(首次交接前为空)_
 
   return {
     researchPath, planPath,
+    researchAttachmentId,
+    planAttachmentId,
     multicaProjectId: project.id,
     multicaResearchIssueId: researchIssue.id,
     multicaIssueId: issue.id,

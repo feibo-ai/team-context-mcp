@@ -2,6 +2,7 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { renderPlanHtml } from '../render/plan-html.js';
 
 export const planCreateInput = z.object({
   projectPath: z.string(),
@@ -27,6 +28,8 @@ export interface PlanCreateOutput {
   planPath: string;
   multicaIssueId: string;
   alreadyExisted: boolean;
+  attachmentId: string | null;
+  uploadError?: string;
 }
 
 export async function planCreate(
@@ -39,8 +42,10 @@ export async function planCreate(
     input.projectPath,
     'docs',
     'plans',
-    `plan_${date}_${input.slug}.md`
+    `plan_${date}_${input.slug}.html`
   );
+
+  const html = renderPlanHtml(input);
 
   // Idempotency: if file exists, just return it
   let existed = false;
@@ -49,68 +54,34 @@ export async function planCreate(
     existed = true;
   } catch {
     await mkdir(dirname(planPath), { recursive: true });
-    const body = renderPlanMarkdown(input, date);
-    await writeFile(planPath, body, 'utf-8');
+    await writeFile(planPath, html, 'utf-8');
   }
 
   const issue = await deps.client.createIssue({
     title: `计划:${input.slug}`,
-    body: `Plan markdown: \`${planPath}\``,
+    body: `Plan: \`${planPath}\``,
     labels: ['计划-草稿'],
   });
 
-  return { planPath, multicaIssueId: issue.id, alreadyExisted: existed };
-}
-
-function renderPlanMarkdown(input: PlanCreateInput, date: string): string {
-  if (input.layer === 'task') {
-    return `# 计划:${input.slug}
-
-**创建:** ${date}
-**层级:** task
-
-**做什么:** ${input.goal}
-**完成于:** ${input.completionCriteria.join('; ')}
-**边界:** (暂不包含: TBD)
-`;
+  let attachmentId: string | null = null;
+  let uploadError: string | undefined;
+  try {
+    const att = await deps.client.uploadFile(
+      html,
+      `plan_${date}_${input.slug}_v1.html`,
+      issue.id,
+      'text/html'
+    );
+    attachmentId = att.id;
+  } catch (e) {
+    uploadError = (e as Error).message;
   }
 
-  const criteria = input.completionCriteria.map((c) => `- [ ] ${c}`).join('\n');
-  const exec = (input.exec || []).join(', ') || '_(unassigned)_';
-  const collab = (input.collab || []).join(', ') || '_(none)_';
-  const reviewer = input.reviewer || '_(assign before Implement phase)_';
-  const approach = input.approach || '_(fill in)_';
-
-  return `# 计划:${input.slug}
-
-**创建:** ${date}
-**DRI:** ${input.dri || '_(待指派)_'}
-**层级:** project
-
-## 目标
-${input.goal}
-
-## 完成标准
-${criteria}
-
-## 分工
-- DRI: ${input.dri || '_(待指派)_'}
-- EXEC: ${exec}
-- COLLAB: ${collab}
-- REVIEW: ${reviewer}
-
-## 投入预算
-${input.appetite || '_(待设定)_'}
-
-## 方案
-${approach}
-
-## 评审
-- Reviewer: _(pending)_
-- Reviewed: _(pending)_
-- Verdict: pending
-
-## 当前状态(交接槽 · 见 pre-clear skill)
-_(首次交接前为空)_
-`;
+  return {
+    planPath,
+    multicaIssueId: issue.id,
+    alreadyExisted: existed,
+    attachmentId,
+    uploadError,
+  };
 }

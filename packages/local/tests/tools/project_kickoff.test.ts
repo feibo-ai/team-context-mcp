@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,7 +23,7 @@ describe('project_kickoff', () => {
     await agent.close();
   });
 
-  it('creates research + plan skeletons + multica project + initial issue', async () => {
+  it('creates research + plan HTML + multica project + 2 issues + uploads both attachments', async () => {
     const pool = agent.get('http://m.test');
     interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/projects', method: 'POST' })
@@ -38,6 +38,8 @@ describe('project_kickoff', () => {
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
     labelMap: STANDARD_LABEL_MAP });
+    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-x' });
+    client.uploadFile = uploadFile;
 
     const r = await projectKickoff({
       projectPath: dir, slug: 'kickoff-test',
@@ -45,8 +47,8 @@ describe('project_kickoff', () => {
       goalDraft: 'cut p99 from 800ms to <400ms',
     }, { client });
 
-    expect(r.researchPath).toMatch(/docs\/research\/research_\d{4}-\d{2}-\d{2}_kickoff-test\.md/);
-    expect(r.planPath).toMatch(/docs\/plans\/plan_\d{4}-\d{2}-\d{2}_kickoff-test\.md/);
+    expect(r.researchPath).toMatch(/docs\/research\/research_\d{4}-\d{2}-\d{2}_kickoff-test\.html/);
+    expect(r.planPath).toMatch(/docs\/plans\/plan_\d{4}-\d{2}-\d{2}_kickoff-test\.html/);
     expect(r.multicaProjectId).toBe('proj_k1');
     expect(r.multicaResearchIssueId).toBe('research_k1');
     expect(r.multicaIssueId).toBe('issue_k1');
@@ -57,11 +59,28 @@ describe('project_kickoff', () => {
     expect(r.broadcastSuggestion.text).toContain('alice');
 
     const research = await readFile(r.researchPath, 'utf-8');
-    expect(research).toContain('# 研究:reduce p99 latency');
-    expect(research).toContain('## 问题');
+    expect(research).toContain('<!DOCTYPE html>');
+    expect(research).toContain('reduce p99 latency');
 
     const plan = await readFile(r.planPath, 'utf-8');
-    expect(plan).toContain('cut p99 from 800ms to <400ms');
-    expect(plan).toContain('DRI: alice');
+    expect(plan).toContain('<!DOCTYPE html>');
+    // goalDraft contains '<', so esc() renders it as &lt;
+    expect(plan).toContain('cut p99 from 800ms to &lt;400ms');
+
+    // Two uploads: research issue + plan issue.
+    expect(uploadFile).toHaveBeenCalledTimes(2);
+    const [rContent, rName, rIssueId, rType] = uploadFile.mock.calls[0];
+    expect(rContent).toBe(research);
+    expect(rName).toMatch(/^research_\d{4}-\d{2}-\d{2}_kickoff-test_v1\.html$/);
+    expect(rIssueId).toBe('research_k1');
+    expect(rType).toBe('text/html');
+    const [pContent, pName, pIssueId, pType] = uploadFile.mock.calls[1];
+    expect(pContent).toBe(plan);
+    expect(pName).toMatch(/^plan_\d{4}-\d{2}-\d{2}_kickoff-test_v1\.html$/);
+    expect(pIssueId).toBe('issue_k1');
+    expect(pType).toBe('text/html');
+
+    expect(r.researchAttachmentId).toBe('att-x');
+    expect(r.planAttachmentId).toBe('att-x');
   });
 });

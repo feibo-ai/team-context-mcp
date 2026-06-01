@@ -2,6 +2,7 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { renderCaseHtml } from '../render/case-html.js';
 
 export const caseCreateInput = z.object({
   projectPath: z.string(),
@@ -33,6 +34,8 @@ export type CaseCreateInput = z.infer<typeof caseCreateInput>;
 export interface CaseCreateOutput {
   casePath: string;
   multicaIssueId: string;
+  attachmentId: string | null;
+  uploadError?: string;
 }
 
 export async function caseCreate(
@@ -41,7 +44,7 @@ export async function caseCreate(
 ): Promise<CaseCreateOutput> {
   const input = caseCreateInput.parse(raw);
   const date = new Date().toISOString().slice(0, 10);
-  const casePath = join(input.projectPath, 'cases', `${date}-${input.slug}.md`);
+  const casePath = join(input.projectPath, 'cases', `${date}-${input.slug}.html`);
 
   try {
     await access(casePath);
@@ -54,8 +57,8 @@ export async function caseCreate(
   }
 
   await mkdir(dirname(casePath), { recursive: true });
-  const body = renderCase(input);
-  await writeFile(casePath, body, 'utf-8');
+  const html = renderCaseHtml(input);
+  await writeFile(casePath, html, 'utf-8');
 
   const issue = await deps.client.createIssue({
     title: `复盘:${input.slug}`,
@@ -71,47 +74,17 @@ export async function caseCreate(
     await deps.client.updateIssue(issue.id, { parentIssueId: input.planIssueId });
   }
 
-  return { casePath, multicaIssueId: issue.id };
-}
+  // Upload the rendered HTML as an attachment on the issue so it renders in
+  // multica. Upload failure must NOT throw — the local case file + issue are
+  // already the source of truth.
+  let attachmentId: string | null = null;
+  let uploadError: string | undefined;
+  try {
+    const att = await deps.client.uploadFile(html, `case_${date}_${input.slug}_v1.html`, issue.id, 'text/html');
+    attachmentId = att.id;
+  } catch (e) {
+    uploadError = (e as Error).message;
+  }
 
-function renderCase(i: CaseCreateInput): string {
-  const criteria = i.criteriaResults
-    .map((c) =>
-      `- [${c.met ? 'x' : ' '}] ${c.criterion}${c.met ? '' : c.notMetReason ? ` — ${c.notMetReason}` : ''}`
-    )
-    .join('\n');
-
-  const judgments = i.keyJudgments
-    .map(
-      (j) =>
-        `### 判断:${j.title}\n` +
-        `- **背景:** ${j.context}\n` +
-        `- **选项:** ${j.options.join(' / ')}\n` +
-        `- **选择:** ${j.chose}\n` +
-        `- **事后看:** ${j.inHindsight}\n` +
-        `- **"古法不可能"检验:** ${j.ancientImpossible}\n`
-    )
-    .join('\n');
-
-  const candidates = i.ruleCandidates.length
-    ? i.ruleCandidates.map((c) => `- [ ] 待 DRI 决定是否晋升: ${c}`).join('\n')
-    : '_(无 — 本项目无通用规则候选)_';
-
-  return `# 复盘:${i.slug}
-
-## 1. 目标
-${i.goal}
-
-## 2. 实际发生了什么
-${i.whatHappened}
-
-## 3. 完成标准
-${criteria}
-
-## 4. 关键判断
-${judgments}
-
-## 5. 通用规则候选
-${candidates}
-`;
+  return { casePath, multicaIssueId: issue.id, attachmentId, uploadError };
 }

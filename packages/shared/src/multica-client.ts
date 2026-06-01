@@ -1,4 +1,4 @@
-import { request } from 'undici';
+import { request, FormData } from 'undici';
 import type { MulticaIssue } from './types.js';
 
 export interface MulticaConfig {
@@ -97,11 +97,51 @@ export class MulticaClient {
     return issue;
   }
 
+  /**
+   * POST /api/issues/{id}/comments — multica's Go API expects `content` (NOT
+   * `body`); sending `body` returns 400 `{"error":"content is required"}`.
+   * Same field-name trap as createIssue's `description`. Confirmed live
+   * 2026-06-01 (surfaced via plan_upgrade/session_handoff e2e; the unit mocks
+   * never exercised the wire shape). Affects all comment callers
+   * (plan_upgrade, session_handoff, plan_request_review, betting_table_capture).
+   */
   commentOnIssue(issueId: string, body: string): Promise<{ id: string }> {
     return this.req(`/api/issues/${issueId}/comments`, {
       method: 'POST',
-      body: { body },
+      body: { content: body },
     });
+  }
+
+  /**
+   * POST /api/upload-file — multipart. 字段 `file`(内容)+ 可选 `issue_id`
+   * (同请求关联到 issue,无需单独 attach)。返回 attachment { id, ... }。
+   * 蓝本:tc-multica/server/internal/cli/client.go UploadFile。
+   */
+  async uploadFile(
+    content: string,
+    filename: string,
+    issueId?: string,
+    contentType = 'text/html'
+  ): Promise<{ id: string; url?: string }> {
+    const form = new FormData();
+    form.set('file', new Blob([content], { type: contentType }), filename);
+    if (issueId) form.set('issue_id', issueId);
+
+    const res = await request(`${this.cfg.serverUrl}/api/upload-file`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.cfg.token}`,
+        'X-Workspace-Id': this.cfg.workspaceId,
+      },
+      body: form,
+    });
+    if (res.statusCode >= 400) {
+      const text = await res.body.text();
+      throw new Error(`upload-file ${res.statusCode}: ${text}`);
+    }
+    const json = (await res.body.json()) as { id: string; url?: string };
+    if (!json.id) throw new Error('upload-file response missing id');
+    return json;
   }
 
   /**
