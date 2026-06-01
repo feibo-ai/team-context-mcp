@@ -2,6 +2,7 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
+import { renderResearchHtml } from '../render/research-html.js';
 
 export const researchCreateInput = z.object({
   projectPath: z.string(),
@@ -9,16 +10,26 @@ export const researchCreateInput = z.object({
   question: z.string().min(20),
 });
 
+export interface ResearchCreateOutput {
+  researchPath: string;
+  multicaIssueId: string;
+  alreadyExisted: boolean;
+  attachmentId: string | null;
+  uploadError?: string;
+}
+
 export async function researchCreate(
   raw: z.infer<typeof researchCreateInput>,
   deps: { client: MulticaClient }
-): Promise<{ researchPath: string; multicaIssueId: string; alreadyExisted: boolean }> {
+): Promise<ResearchCreateOutput> {
   const input = researchCreateInput.parse(raw);
   const date = new Date().toISOString().slice(0, 10);
   const researchPath = join(
     input.projectPath, 'docs', 'research',
-    `research_${date}_${input.slug}.md`
+    `research_${date}_${input.slug}.html`
   );
+
+  const html = renderResearchHtml(input);
 
   let existed = false;
   try {
@@ -26,37 +37,7 @@ export async function researchCreate(
     existed = true;
   } catch {
     await mkdir(dirname(researchPath), { recursive: true });
-    const body = `# 研究:${input.slug}
-
-**日期**: ${date}
-**研究者**: (你的名字 / 你的 claude-session-id)
-
-## 问题
-${input.question}
-
-## 发现
-
-### 现有代码
-- TBD
-
-### 先例
-- TBD (行业论文 / 类似仓库 / 已知参考)
-
-### 陷阱
-- TBD (已知失败模式 / 坑)
-
-### 约束
-- TBD (团队 SOP / 安全 / 合规 / 时间)
-
-## 待解问题
-- TBD (研究没能回答的 — Plan session 前必须解决)
-
-## 推荐方案 (选项,非决定)
-1. TBD
-2. TBD
-3. TBD
-`;
-    await writeFile(researchPath, body, 'utf-8');
+    await writeFile(researchPath, html, 'utf-8');
   }
 
   const issue = await deps.client.createIssue({
@@ -65,5 +46,14 @@ ${input.question}
     labels: ['研究'],
   });
 
-  return { researchPath, multicaIssueId: issue.id, alreadyExisted: existed };
+  let attachmentId: string | null = null;
+  let uploadError: string | undefined;
+  try {
+    const att = await deps.client.uploadFile(html, `research_${date}_${input.slug}_v1.html`, issue.id, 'text/html');
+    attachmentId = att.id;
+  } catch (e) {
+    uploadError = (e as Error).message;
+  }
+
+  return { researchPath, multicaIssueId: issue.id, alreadyExisted: existed, attachmentId, uploadError };
 }

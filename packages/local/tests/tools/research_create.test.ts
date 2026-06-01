@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,30 +23,35 @@ describe('research_create', () => {
     await agent.close();
   });
 
-  it('writes research skeleton with 4 dimensions + creates issue', async () => {
+  it('writes research HTML with question + creates issue + uploads attachment', async () => {
     const pool = agent.get('http://m.test');
     interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_1', labels: ['research'] });
 
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
+    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-1' });
+    client.uploadFile = uploadFile;
+
     const r = await researchCreate({
       projectPath: dir,
       slug: 'cache-strategy',
       question: 'How should we restructure cache keys to handle hot keys at scale?',
     }, { client });
 
-    expect(r.researchPath).toMatch(/docs\/research\/research_\d{4}-\d{2}-\d{2}_cache-strategy\.md/);
+    expect(r.researchPath).toMatch(/docs\/research\/research_\d{4}-\d{2}-\d{2}_cache-strategy\.html$/);
     expect(r.multicaIssueId).toBe('r_1');
 
     const content = await readFile(r.researchPath, 'utf-8');
-    expect(content).toContain('# 研究:');
-    expect(content).toContain('## 问题');
-    expect(content).toContain('### 现有代码');
-    expect(content).toContain('### 先例');
-    expect(content).toContain('### 陷阱');
-    expect(content).toContain('### 约束');
-    expect(content).toContain('## 待解问题');
-    expect(content).toContain('## 推荐方案');
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('How should we restructure cache keys to handle hot keys at scale?');
+
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+    const [uploadedContent, filename, issueId, contentType] = uploadFile.mock.calls[0];
+    expect(uploadedContent).toBe(content);
+    expect(filename).toMatch(/^research_\d{4}-\d{2}-\d{2}_cache-strategy_v1\.html$/);
+    expect(issueId).toBe('r_1');
+    expect(contentType).toBe('text/html');
+    expect(r.attachmentId).toBe('att-1');
   });
 
   it('returns alreadyExisted=true on second call without rewriting the file', async () => {
@@ -56,6 +61,7 @@ describe('research_create', () => {
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_a', labels: ['research'] }).persist();
 
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
+    client.uploadFile = vi.fn().mockResolvedValue({ id: 'att-1' });
     const args = {
       projectPath: dir,
       slug: 'cache-strategy',
