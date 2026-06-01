@@ -10,6 +10,8 @@ function spyClient() {
     addLabel: vi.fn(async () => {}),
     removeLabel: vi.fn(async () => {}),
     updateIssue: vi.fn(async () => ({})),
+    uploadFile: vi.fn().mockResolvedValue({ id: 'att-2' }),
+    commentOnIssue: vi.fn().mockResolvedValue({ id: 'c1' }),
   } as unknown as MulticaClient;
 }
 
@@ -49,6 +51,51 @@ describe('plan_upgrade', () => {
     expect(client.removeLabel).toHaveBeenCalledWith('issue_p1', '计划-已批准');
     expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-已升级');
     expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-草稿');
+    expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
+  });
+
+  it('when planInput provided → regenerates HTML, uploads versioned attachment + comments', async () => {
+    const planPath = join(dir, 'plan_x.html');
+    await writeFile(planPath, '<!DOCTYPE html><html>old v1</html>');
+    const client = spyClient();
+
+    await planUpgrade(
+      {
+        planPath,
+        multicaIssueId: 'issue_p1',
+        reason: 'realized X was wrong, need to redo Y',
+        version: 2,
+        planInput: {
+          projectPath: dir,
+          slug: 'feed-latency',
+          layer: 'project',
+          dri: 'alice',
+          goal: 'Reduce p99 to <300ms',
+          completionCriteria: ['p99 <300ms over 24h prod'],
+          appetite: '1 week',
+        },
+      },
+      { client },
+    );
+
+    // Local HTML file overwritten with freshly regenerated plan.
+    const updated = await readFile(planPath, 'utf-8');
+    expect(updated).toContain('<!DOCTYPE html>');
+    expect(updated).toContain('Reduce p99 to &lt;300ms');
+
+    // New versioned attachment uploaded (do NOT delete old) + associated to issue.
+    expect(client.uploadFile).toHaveBeenCalled();
+    const upCall = (client.uploadFile as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(upCall[1]).toMatch(/_v\d+\.html$/);
+    expect(upCall[2]).toBe('issue_p1');
+
+    // Comment posted documenting the upgrade.
+    expect(client.commentOnIssue).toHaveBeenCalled();
+    expect((client.commentOnIssue as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('issue_p1');
+
+    // Existing label/status flow must still run.
+    expect(client.removeLabel).toHaveBeenCalledWith('issue_p1', '计划-已批准');
+    expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-已升级');
     expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
   });
 });
