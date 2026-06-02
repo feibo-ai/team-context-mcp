@@ -10,7 +10,7 @@ function spyClient() {
     addLabel: vi.fn(async () => {}),
     removeLabel: vi.fn(async () => {}),
     updateIssue: vi.fn(async () => ({})),
-    uploadFile: vi.fn().mockResolvedValue({ id: 'att-2', url: '/uploads/ws/att-2.html' }),
+    publishDoc: vi.fn().mockResolvedValue({ attachmentId: 'att-2', commentId: 'c1', url: '/uploads/ws/att-2.html' }),
     commentOnIssue: vi.fn().mockResolvedValue({ id: 'c1' }),
   } as unknown as MulticaClient;
 }
@@ -38,7 +38,7 @@ describe('plan_upgrade', () => {
 
     // Degraded: no attachment, no HTML regeneration, no comment.
     expect(r.attachmentId).toBeNull();
-    expect(client.uploadFile).not.toHaveBeenCalled();
+    expect(client.publishDoc).not.toHaveBeenCalled();
     expect(client.commentOnIssue).not.toHaveBeenCalled();
 
     // State machine still runs: clears approved, marks upgraded + draft, → in_review.
@@ -82,14 +82,16 @@ describe('plan_upgrade', () => {
     expect(updated).toContain('Reduce p99 to &lt;300ms');
     expect(updated).not.toContain('old v1');
 
-    // New versioned attachment uploaded (append, never delete) + associated.
-    const upCall = (client.uploadFile as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(upCall[1]).toBe('plan_v2.html');
-    expect(upCall[2]).toBe('issue_p1');
+    // New versioned doc published as a COMMENT (append, never mutate) via
+    // publishDoc: vN filename + the upgrade reason in the caption.
+    const pubCall = (client.publishDoc as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(pubCall[0]).toBe('issue_p1');
+    expect(pubCall[1].filename).toBe('plan_v2.html');
+    expect(pubCall[1].caption).toContain('v2');
+    expect(pubCall[1].caption).toContain('realized X was wrong');
 
-    // Comment documents the upgrade.
-    expect(client.commentOnIssue).toHaveBeenCalled();
-    expect((client.commentOnIssue as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('issue_p1');
+    // Success path: publishDoc owns the comment, so no separate text comment.
+    expect(client.commentOnIssue).not.toHaveBeenCalled();
 
     // NO local markdown snapshot is created (versions live on the issue only).
     const files = await readdir(dir);
@@ -100,19 +102,16 @@ describe('plan_upgrade', () => {
     expect(client.addLabel).toHaveBeenCalledWith('issue_p1', '计划-已升级');
     expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
 
-    // After a successful upload (with url), the doc is embedded into the issue
-    // description (!file token) + bound via attachmentIds so it renders inline.
-    const embedArg = (client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.description?.includes('!file['))?.[1];
-    expect(embedArg).toBeDefined();
-    expect(embedArg.description).toContain('!file[');
-    expect(embedArg.attachmentIds).toContain('att-2');
+    // description is NEVER rewritten with the doc (append-only comment model).
+    const descEmbed = (client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.description?.includes('!file['));
+    expect(descEmbed).toBeUndefined();
   });
 
   it('upload failure is non-fatal — labels/status land, comment notes the failure', async () => {
     const planPath = join(dir, 'plan_x.html');
     await writeFile(planPath, '<!DOCTYPE html><html>old</html>');
     const client = spyClient();
-    (client.uploadFile as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    (client.publishDoc as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
     const r = await planUpgrade(
       {
@@ -139,6 +138,6 @@ describe('plan_upgrade', () => {
     expect(client.updateIssue).toHaveBeenCalledWith('issue_p1', { status: 'in_review' });
     // comment still posted, flagging the upload failure
     const note = (client.commentOnIssue as ReturnType<typeof vi.fn>).mock.calls[0][1];
-    expect(note).toMatch(/上传失败/);
+    expect(note).toMatch(/发布失败/);
   });
 });

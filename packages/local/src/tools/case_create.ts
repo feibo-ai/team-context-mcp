@@ -2,7 +2,6 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
-import { fileEmbed } from '@tcmcp/shared';
 import { renderCaseHtml } from '../render/case-html.js';
 
 export const caseCreateInput = z.object({
@@ -63,7 +62,7 @@ export async function caseCreate(
 
   const issue = await deps.client.createIssue({
     title: `复盘:${input.slug}`,
-    body: `Case file: \`${casePath}\``,
+    body: `📄 案例文档以评论形式发布(见下方评论)。本地副本:\`${casePath}\``,
     labels: ['复盘-待审'],
     projectId: input.multicaProjectId,
   });
@@ -75,23 +74,19 @@ export async function caseCreate(
     await deps.client.updateIssue(issue.id, { parentIssueId: input.planIssueId });
   }
 
-  // Upload the rendered HTML as an attachment on the issue so it renders in
-  // multica. Upload failure must NOT throw — the local case file + issue are
-  // already the source of truth.
+  // Publish the rendered HTML as a COMMENT (append-only · renders inline via
+  // !file). NOT the issue description. Failure is non-fatal — the local case
+  // file + issue are already the source of truth.
   let attachmentId: string | null = null;
   let uploadError: string | undefined;
   const filename = `case_${date}_${input.slug}_v1.html`;
   try {
-    const att = await deps.client.uploadFile(html, filename, issue.id, 'text/html');
-    attachmentId = att.id;
-    // Embed the doc in the issue description so it renders inline in the issue
-    // body (issue-level binding alone has no render surface — see fileEmbed).
-    if (att.url) {
-      await deps.client.updateIssue(issue.id, {
-        description: `案例文档(方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
-        attachmentIds: [att.id],
-      });
-    }
+    const pub = await deps.client.publishDoc(issue.id, {
+      html,
+      filename,
+      caption: '案例文档(方案A · 下方渲染)',
+    });
+    attachmentId = pub.attachmentId;
   } catch (e) {
     uploadError = (e as Error).message;
   }

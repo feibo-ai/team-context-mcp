@@ -9,7 +9,7 @@ function spyClient() {
   return {
     createIssue: vi.fn(async () => ({ id: 'c1' })),
     updateIssue: vi.fn(async () => ({})),
-    uploadFile: vi.fn().mockResolvedValue({ id: 'att-1', url: '/uploads/ws/att-1.html' }),
+    publishDoc: vi.fn().mockResolvedValue({ attachmentId: 'att-1', commentId: 'cm1', url: '/uploads/ws/att-1.html' }),
   } as unknown as MulticaClient;
 }
 
@@ -50,7 +50,7 @@ describe('case_create', () => {
     expect(r.multicaIssueId).toBe('c1');
     expect(r.attachmentId).toBe('att-1');
     expect(client.createIssue).toHaveBeenCalled();
-    expect(client.uploadFile).toHaveBeenCalled();
+    expect(client.publishDoc).toHaveBeenCalled();
     const content = await readFile(r.casePath, 'utf-8');
     expect(content).toContain('<h2>1 · 目标</h2>');
     expect(content).toContain('<h2>2 · 实际发生</h2>');
@@ -61,12 +61,12 @@ describe('case_create', () => {
     expect(content).toContain('Reduce p99 to &lt;400ms');
     // No planIssueId provided → no parent link set (no updateIssue carries parentIssueId).
     expect((client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.parentIssueId)).toBeUndefined();
-    // But the doc IS embedded into the description (!file token) + bound via
-    // attachmentIds after a successful upload (with url), so it renders inline.
-    const embedArg = (client.updateIssue as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.description?.includes('!file['))?.[1];
-    expect(embedArg).toBeDefined();
-    expect(embedArg.description).toContain('!file[');
-    expect(embedArg.attachmentIds).toContain('att-1');
+    // The doc goes to a COMMENT (publishDoc · append-only !file embed), never
+    // the description. publishDoc internally uploads + comments + binds.
+    const pubArg = (client.publishDoc as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(pubArg[0]).toBe('c1');
+    expect(pubArg[1].filename).toMatch(/_v1\.html$/);
+    expect(pubArg[1].caption).toContain('案例文档');
   });
 
   it('links case → plan via parent_issue_id when planIssueId given', async () => {

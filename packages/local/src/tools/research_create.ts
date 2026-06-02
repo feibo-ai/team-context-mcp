@@ -2,7 +2,6 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
-import { fileEmbed } from '@tcmcp/shared';
 import { renderResearchHtml } from '../render/research-html.js';
 
 export const researchCreateInput = z.object({
@@ -43,27 +42,18 @@ export async function researchCreate(
 
   const issue = await deps.client.createIssue({
     title: `研究:${input.slug}`,
-    body: `Research session for: ${input.question}\n\nFile: \`${researchPath}\``,
+    body:
+      `📄 调研进行中 · 发现完成后以**评论**形式发布(\`doc_publish\` · !file 内联渲染)。\n` +
+      `本地骨架:\`${researchPath}\`\n\nResearch question: ${input.question}`,
     labels: ['研究'],
   });
 
-  const filename = `research_${date}_${input.slug}_v1.html`;
-  let attachmentId: string | null = null;
-  let uploadError: string | undefined;
-  try {
-    const att = await deps.client.uploadFile(html, filename, issue.id, 'text/html');
-    attachmentId = att.id;
-    // Embed the doc in the issue description so it renders inline in the issue
-    // body (issue-level binding alone has no render surface — see fileEmbed).
-    if (att.url) {
-      await deps.client.updateIssue(issue.id, {
-        description: `研究文档(方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
-        attachmentIds: [att.id],
-      });
-    }
-  } catch (e) {
-    uploadError = (e as Error).message;
-  }
+  // research_create does NOT publish a doc at create time — the skeleton has no
+  // findings yet (renderResearchHtml only knows the question). The agent fills
+  // the local HTML, then publishes it as a COMMENT via the doc_publish tool
+  // (append-only · !file embed) — never by mutating an attachment or rewriting
+  // the description. Uploading an empty skeleton here is exactly what stranded
+  // the earlier flow (immutable attachment + no fill path).
 
-  return { researchPath, multicaIssueId: issue.id, alreadyExisted: existed, attachmentId, uploadError };
+  return { researchPath, multicaIssueId: issue.id, alreadyExisted: existed, attachmentId: null };
 }

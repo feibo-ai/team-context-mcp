@@ -65,9 +65,10 @@ describe('session_handoff', () => {
 
   it('backward compat — no planInput → posts comment, never uploads', async () => {
     const commentOnIssue = vi.fn().mockResolvedValue({ id: 'cmt-1' });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-h', url: '/uploads/ws/att-h.html' });
-    const updateIssue = vi.fn().mockResolvedValue({});
-    const client = { commentOnIssue, uploadFile, updateIssue } as unknown as MulticaClient;
+    const uploadFile = vi.fn();
+    const updateIssue = vi.fn();
+    const publishDoc = vi.fn();
+    const client = { commentOnIssue, uploadFile, updateIssue, publishDoc } as unknown as MulticaClient;
 
     const r = await sessionHandoff(
       {
@@ -86,13 +87,15 @@ describe('session_handoff', () => {
     // no planInput → must NOT upload any attachment (and thus never embed)
     expect(uploadFile).not.toHaveBeenCalled();
     expect(updateIssue).not.toHaveBeenCalled();
+    expect(publishDoc).not.toHaveBeenCalled();
   });
 
   it('regenerates HTML attachment when planInput + multicaIssueId provided', async () => {
     const commentOnIssue = vi.fn().mockResolvedValue({ id: 'cmt-1' });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-h', url: '/uploads/ws/att-h.html' });
-    const updateIssue = vi.fn().mockResolvedValue({});
-    const client = { commentOnIssue, uploadFile, updateIssue } as unknown as MulticaClient;
+    const uploadFile = vi.fn();
+    const updateIssue = vi.fn();
+    const publishDoc = vi.fn().mockResolvedValue({ attachmentId: 'att-h', commentId: 'cm-h', url: '/uploads/ws/att-h.html' });
+    const client = { commentOnIssue, uploadFile, updateIssue, publishDoc } as unknown as MulticaClient;
 
     const planHtmlPath = join(dir, 'docs', 'plans', 'plan_2026-05-26_x.html');
     await writeFile(planHtmlPath, '<!DOCTYPE html><html>old</html>', 'utf-8');
@@ -122,14 +125,13 @@ describe('session_handoff', () => {
     expect(commentOnIssue).toHaveBeenCalledTimes(1);
     expect(r.multicaCommentId).toBe('cmt-1');
 
-    // new: HTML attachment uploaded with text/html + the issueId
-    expect(uploadFile).toHaveBeenCalledTimes(1);
-    const [content, filename, issueId, contentType] = uploadFile.mock.calls[0];
-    expect(content).toContain('<!DOCTYPE html>');
-    expect(content).toContain('Reduce p99 to &lt;400ms');
-    expect(filename).toMatch(/^plan_handoff_\d+\.html$/);
-    expect(issueId).toBe('issue_h1');
-    expect(contentType).toBe('text/html');
+    // new: regenerated plan published as a COMMENT via publishDoc
+    expect(publishDoc).toHaveBeenCalledTimes(1);
+    const [pIssueId, pOpts] = publishDoc.mock.calls[0];
+    expect(pIssueId).toBe('issue_h1');
+    expect(pOpts.html).toContain('<!DOCTYPE html>');
+    expect(pOpts.html).toContain('Reduce p99 to &lt;400ms');
+    expect(pOpts.filename).toMatch(/^plan_handoff_\d+\.html$/);
 
     // local .html overwritten with regenerated plan
     const onDisk = await readFile(planHtmlPath, 'utf-8');
@@ -142,12 +144,8 @@ describe('session_handoff', () => {
     expect(onDisk).toContain('wire bar()');
     expect(onDisk).toContain('You-are-right loop');
 
-    // After a successful upload (with url), the doc is embedded into the issue
-    // description (!file token) + bound via attachmentIds so it renders inline.
-    const embedArg = updateIssue.mock.calls.find((c) => c[1]?.description?.includes('!file['))?.[1];
-    expect(embedArg).toBeDefined();
-    expect(embedArg.description).toContain('!file[');
-    expect(embedArg.attachmentIds).toContain('att-h');
+    // append-only comment model: the description is NEVER rewritten with the doc
+    expect(updateIssue).not.toHaveBeenCalled();
   });
 
   it('does NOT corrupt an .html plan when no planInput (B1 regression)', async () => {

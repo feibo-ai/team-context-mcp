@@ -23,7 +23,7 @@ describe('project_kickoff', () => {
     await agent.close();
   });
 
-  it('creates research + plan HTML + multica project + 2 issues + uploads both attachments', async () => {
+  it('creates research + plan HTML + project + 2 issues; publishes the plan as a comment (research stub filled later)', async () => {
     const pool = agent.get('http://m.test');
     interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/projects', method: 'POST' })
@@ -38,10 +38,8 @@ describe('project_kickoff', () => {
     const client = new MulticaClient({
       serverUrl: 'http://m.test', token: 't', workspaceId: 'w',
     labelMap: STANDARD_LABEL_MAP });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-x', url: '/uploads/ws/att-x.html' });
-    client.uploadFile = uploadFile;
-    const updateIssue = vi.fn().mockResolvedValue({});
-    client.updateIssue = updateIssue;
+    const publishDoc = vi.fn().mockResolvedValue({ attachmentId: 'att-x', commentId: 'cm-x', url: '/uploads/ws/att-x.html' });
+    client.publishDoc = publishDoc;
 
     const r = await projectKickoff({
       projectPath: dir, slug: 'kickoff-test',
@@ -69,31 +67,17 @@ describe('project_kickoff', () => {
     // goalDraft contains '<', so esc() renders it as &lt;
     expect(plan).toContain('cut p99 from 800ms to &lt;400ms');
 
-    // Two uploads: research issue + plan issue.
-    expect(uploadFile).toHaveBeenCalledTimes(2);
-    const [rContent, rName, rIssueId, rType] = uploadFile.mock.calls[0];
-    expect(rContent).toBe(research);
-    expect(rName).toMatch(/^research_\d{4}-\d{2}-\d{2}_kickoff-test_v1\.html$/);
-    expect(rIssueId).toBe('research_k1');
-    expect(rType).toBe('text/html');
-    const [pContent, pName, pIssueId, pType] = uploadFile.mock.calls[1];
-    expect(pContent).toBe(plan);
-    expect(pName).toMatch(/^plan_\d{4}-\d{2}-\d{2}_kickoff-test_v1\.html$/);
+    // The plan doc is published as a COMMENT (append-only · !file inline). The
+    // research issue is a STUB — nothing published now (the agent fills it and
+    // publishes findings via doc_publish later). So exactly ONE publishDoc, to
+    // the plan issue.
+    expect(publishDoc).toHaveBeenCalledTimes(1);
+    const [pIssueId, pOpts] = publishDoc.mock.calls[0];
     expect(pIssueId).toBe('issue_k1');
-    expect(pType).toBe('text/html');
+    expect(pOpts.html).toBe(plan);
+    expect(pOpts.filename).toMatch(/^plan_\d{4}-\d{2}-\d{2}_kickoff-test_v1\.html$/);
 
-    expect(r.researchAttachmentId).toBe('att-x');
+    expect(r.researchAttachmentId).toBeNull();
     expect(r.planAttachmentId).toBe('att-x');
-
-    // Both docs embedded into their issue's description (!file token) + bound via
-    // attachmentIds after a successful upload (with url), so each renders inline.
-    const researchEmbed = updateIssue.mock.calls.find((c) => c[0] === 'research_k1' && c[1]?.description?.includes('!file['))?.[1];
-    expect(researchEmbed).toBeDefined();
-    expect(researchEmbed.description).toContain('!file[');
-    expect(researchEmbed.attachmentIds).toContain('att-x');
-    const planEmbed = updateIssue.mock.calls.find((c) => c[0] === 'issue_k1' && c[1]?.description?.includes('!file['))?.[1];
-    expect(planEmbed).toBeDefined();
-    expect(planEmbed.description).toContain('!file[');
-    expect(planEmbed.attachmentIds).toContain('att-x');
   });
 });

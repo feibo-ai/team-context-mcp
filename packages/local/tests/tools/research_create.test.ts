@@ -23,16 +23,16 @@ describe('research_create', () => {
     await agent.close();
   });
 
-  it('writes research HTML with question + creates issue + uploads attachment', async () => {
+  it('writes research HTML with question + creates issue (no upload — fill & publish later)', async () => {
     const pool = agent.get('http://m.test');
     interceptAnyLabelAdd(pool);
     pool.intercept({ path: '/api/issues', method: 'POST' }).reply(201, { id: 'r_1', labels: ['research'] });
 
     const client = new MulticaClient({ serverUrl: 'http://m.test', token: 't', workspaceId: 'w', labelMap: STANDARD_LABEL_MAP });
-    const uploadFile = vi.fn().mockResolvedValue({ id: 'att-1', url: '/uploads/ws/att-1.html' });
+    const uploadFile = vi.fn();
     client.uploadFile = uploadFile;
-    const updateIssue = vi.fn().mockResolvedValue({});
-    client.updateIssue = updateIssue;
+    const publishDoc = vi.fn();
+    client.publishDoc = publishDoc;
 
     const r = await researchCreate({
       projectPath: dir,
@@ -47,21 +47,12 @@ describe('research_create', () => {
     expect(content).toContain('<!DOCTYPE html>');
     expect(content).toContain('How should we restructure cache keys to handle hot keys at scale?');
 
-    expect(uploadFile).toHaveBeenCalledTimes(1);
-    const [uploadedContent, filename, issueId, contentType] = uploadFile.mock.calls[0];
-    expect(uploadedContent).toBe(content);
-    expect(filename).toMatch(/^research_\d{4}-\d{2}-\d{2}_cache-strategy_v1\.html$/);
-    expect(issueId).toBe('r_1');
-    expect(contentType).toBe('text/html');
-    expect(r.attachmentId).toBe('att-1');
-
-    // After a successful upload (with url), the doc is embedded into the issue
-    // description (!file token) + bound via attachmentIds so it renders inline.
-    expect(updateIssue).toHaveBeenCalled();
-    const embedArg = updateIssue.mock.calls.find((c: any[]) => c[1]?.description?.includes('!file['))?.[1];
-    expect(embedArg).toBeDefined();
-    expect(embedArg.description).toContain('!file[');
-    expect(embedArg.attachmentIds).toContain('att-1');
+    // research_create does NOT publish at create time — the skeleton has no
+    // findings. The agent fills the local HTML, then publishes via doc_publish
+    // (a COMMENT). So nothing is uploaded/embedded here; attachmentId is null.
+    expect(uploadFile).not.toHaveBeenCalled();
+    expect(publishDoc).not.toHaveBeenCalled();
+    expect(r.attachmentId).toBeNull();
   });
 
   it('returns alreadyExisted=true on second call without rewriting the file', async () => {

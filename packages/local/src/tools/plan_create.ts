@@ -2,7 +2,6 @@ import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
-import { fileEmbed } from '@tcmcp/shared';
 import { renderPlanHtml } from '../render/plan-html.js';
 
 export const planCreateInput = z.object({
@@ -60,7 +59,7 @@ export async function planCreate(
 
   const issue = await deps.client.createIssue({
     title: `计划:${input.slug}`,
-    body: `Plan: \`${planPath}\``,
+    body: `📄 计划文档以评论形式发布(见下方评论 · 最新版在底部)。本地副本:\`${planPath}\``,
     labels: ['计划-草稿'],
   });
 
@@ -68,16 +67,15 @@ export async function planCreate(
   let attachmentId: string | null = null;
   let uploadError: string | undefined;
   try {
-    const att = await deps.client.uploadFile(html, filename, issue.id, 'text/html');
-    attachmentId = att.id;
-    // Embed the doc in the issue description so it renders inline in the issue
-    // body (issue-level binding alone has no render surface — see fileEmbed).
-    if (att.url) {
-      await deps.client.updateIssue(issue.id, {
-        description: `计划文档(方案A · 下方渲染):\n\n${fileEmbed(filename, att.url)}`,
-        attachmentIds: [att.id],
-      });
-    }
+    // Doc → COMMENT (append-only · renders inline via !file). NOT the issue
+    // description: attachments are immutable (the CLI can't re-upload), so every
+    // version is a new comment. See MulticaClient.publishDoc.
+    const pub = await deps.client.publishDoc(issue.id, {
+      html,
+      filename,
+      caption: '计划文档 v1(方案A · 下方渲染)',
+    });
+    attachmentId = pub.attachmentId;
   } catch (e) {
     uploadError = (e as Error).message;
   }
