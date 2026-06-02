@@ -23,7 +23,8 @@ export const caseCreateInput = z.object({
     ancientImpossible: z.string(),
   })).min(1),
   ruleCandidates: z.array(z.string()).max(3).default([]),
-  multicaProjectId: z.string().optional(),
+  // Required: every issue MUST live under a project (pick via `multica project list`).
+  projectId: z.string().min(1),
   // Original plan issue id — when present, the case issue is linked to it via
   // parent_issue_id so case_review can traverse up and auto-close the plan.
   planIssueId: z.string().optional(),
@@ -64,7 +65,7 @@ export async function caseCreate(
     title: `复盘:${input.slug}`,
     body: `📄 案例文档以评论形式发布(见下方评论)。本地副本:\`${casePath}\``,
     labels: ['复盘-待审'],
-    projectId: input.multicaProjectId,
+    projectId: input.projectId,
   });
 
   // 修D · structured link back to the plan issue. createIssue has no parent

@@ -38,6 +38,7 @@ describe('plan_create', () => {
       {
         projectPath: dir,
         slug: 'feed-latency',
+        projectId: 'proj_x',
         layer: 'project',
         dri: 'alice',
         goal: 'Reduce p99 to <400ms',
@@ -51,6 +52,8 @@ describe('plan_create', () => {
     expect(result.multicaIssueId).toBe('issue_p1');
     expect(createIssue).toHaveBeenCalled();
     expect(createIssue.mock.calls[0][0].labels).toContain('计划-草稿');
+    // every issue must be created under a project
+    expect(createIssue.mock.calls[0][0].projectId).toBe('proj_x');
 
     const content = await readFile(result.planPath, 'utf-8');
     expect(content).toContain('<!DOCTYPE html>');
@@ -73,6 +76,7 @@ describe('plan_create', () => {
       {
         projectPath: dir,
         slug: 'feed-latency',
+        projectId: 'proj_x',
         layer: 'project',
         dri: 'alice',
         goal: 'Reduce p99 to <400ms',
@@ -96,6 +100,7 @@ describe('plan_create', () => {
     const args = {
       projectPath: dir,
       slug: 'feed-latency',
+      projectId: 'proj_x',
       layer: 'project' as const,
       dri: 'alice',
       goal: 'Reduce p99 to <400ms',

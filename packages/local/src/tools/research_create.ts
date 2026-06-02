@@ -7,6 +7,9 @@ import { renderResearchHtml } from '../render/research-html.js';
 export const researchCreateInput = z.object({
   projectPath: z.string(),
   slug: z.string().regex(/^[a-z0-9-]+$/),
+  // Required: every issue MUST live under a project (pick via `multica project
+  // list`; the skill enforces certainty / ask-the-user-if-unsure).
+  projectId: z.string().min(1),
   question: z.string().min(20),
 });
 
@@ -46,6 +49,7 @@ export async function researchCreate(
       `📄 调研进行中 · 发现完成后以**评论**形式发布(\`doc_publish\` · !file 内联渲染)。\n` +
       `本地骨架:\`${researchPath}\`\n\nResearch question: ${input.question}`,
     labels: ['研究'],
+    projectId: input.projectId,
   });
 
   // research_create does NOT publish a doc at create time — the skeleton has no

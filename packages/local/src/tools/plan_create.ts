@@ -7,6 +7,9 @@ import { renderPlanHtml } from '../render/plan-html.js';
 export const planCreateInput = z.object({
   projectPath: z.string(),
   slug: z.string().regex(/^[a-z0-9-]+$/),
+  // Required: every issue MUST live under a project. The agent picks it via
+  // `multica project list` (the skill enforces: be certain · ask the user if unsure).
+  projectId: z.string().min(1),
   layer: z.enum(['project', 'task']),
   dri: z.string().optional(),
   goal: z.string().min(10),
@@ -61,6 +64,7 @@ export async function planCreate(
     title: `计划:${input.slug}`,
     body: `📄 计划文档以评论形式发布(见下方评论 · 最新版在底部)。本地副本:\`${planPath}\``,
     labels: ['计划-草稿'],
+    projectId: input.projectId,
   });
 
   const filename = `plan_${date}_${input.slug}_v1.html`;

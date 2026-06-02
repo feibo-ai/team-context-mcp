@@ -37,6 +37,7 @@ describe('research_create', () => {
     const r = await researchCreate({
       projectPath: dir,
       slug: 'cache-strategy',
+      projectId: 'proj_x',
       question: 'How should we restructure cache keys to handle hot keys at scale?',
     }, { client });
 
@@ -67,6 +68,7 @@ describe('research_create', () => {
     const args = {
       projectPath: dir,
       slug: 'cache-strategy',
+      projectId: 'proj_x',
       question: 'How should we restructure cache keys to handle hot keys at scale?',
     };
 
