@@ -169,11 +169,12 @@ async function main(): Promise<void> {
 // can pin the union contract (Bug A′) without spawning the stdio server.
 
 /**
- * Union / discriminatedUnion → keep `oneOf` but merge each branch's properties
- * to the root, else strict MCP clients see a "no-params" tool and strip args
- * (Bug A′). No local tool uses a top-level union today; this keeps parity with
- * the remote walker so a future one can't silently ship broken. required left
- * empty (per-branch / either-or).
+ * Union / discriminatedUnion → merge each branch's properties to the root and
+ * present a flat `{type:'object', properties}`. We do NOT emit a top-level
+ * `oneOf`: the Anthropic tool API rejects `oneOf`/`anyOf`/`allOf` at the root of
+ * a tool input_schema (400). No local tool uses a top-level union today; this
+ * keeps parity with the remote walker so a future one can't silently ship a
+ * schema that 400s Claude Code. required left empty (per-branch / either-or).
  */
 function mergeUnion(branches: unknown[]): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
@@ -181,7 +182,7 @@ function mergeUnion(branches: unknown[]): Record<string, unknown> {
     const bp = (b as { properties?: Record<string, unknown> }).properties;
     if (bp) Object.assign(properties, bp);
   }
-  return { type: 'object', properties, oneOf: branches };
+  return { type: 'object', properties };
 }
 
 export function zodToJsonSchema(s: z.ZodTypeAny): unknown {

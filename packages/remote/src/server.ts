@@ -357,12 +357,16 @@ export function zodToJsonSchema(s: z.ZodTypeAny): unknown {
 }
 
 /**
- * Union / discriminatedUnion → keep `oneOf` for the mutual-exclusivity
- * semantics, but ALSO merge every branch's `properties` up to the root. Without
- * the merged root `properties`, strict MCP clients see a tool that "takes no
- * params" and strip the caller's args (Bug A′ — hit notify_team / betting_table
- * _capture / burnout_check_distribute). `required` is intentionally left empty:
- * the fields are per-branch (either/or), so none is universally required.
+ * Union / discriminatedUnion → merge every branch's `properties` up to the root
+ * and present a flat `{type:'object', properties}`. We deliberately do NOT emit
+ * a top-level `oneOf`: the Anthropic tool API rejects `oneOf`/`anyOf`/`allOf` at
+ * the root of a tool input_schema (400 "input_schema does not support oneOf …"),
+ * which broke every Claude Code request once notify_team / betting_table_capture
+ * / burnout_check_distribute loaded. The runtime zod `.parse()` in each tool
+ * still enforces the discriminated union, so validation is unchanged — only the
+ * API-facing schema is relaxed. Merged root `properties` also keeps strict MCP
+ * clients from seeing a no-param tool (Bug A′). `required` left empty (fields are
+ * per-branch / either-or).
  */
 function mergeUnion(branches: unknown[]): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
@@ -370,7 +374,7 @@ function mergeUnion(branches: unknown[]): Record<string, unknown> {
     const bp = (b as { properties?: Record<string, unknown> }).properties;
     if (bp) Object.assign(properties, bp);
   }
-  return { type: 'object', properties, oneOf: branches };
+  return { type: 'object', properties };
 }
 
 function walk(s: z.ZodTypeAny): unknown {
