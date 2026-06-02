@@ -37,6 +37,7 @@ describe('case_create', () => {
       {
         projectPath: dir,
         slug: 'feed-latency',
+        projectId: 'proj_x',
         goal: 'Reduce p99 to <400ms',
         whatHappened: 'Tried cache tuning. Worked.',
         criteriaResults: [{ criterion: 'p99 <400ms 24h', met: true }],
@@ -50,6 +51,7 @@ describe('case_create', () => {
     expect(r.multicaIssueId).toBe('c1');
     expect(r.attachmentId).toBe('att-1');
     expect(client.createIssue).toHaveBeenCalled();
+    expect((client.createIssue as ReturnType<typeof vi.fn>).mock.calls[0][0].projectId).toBe('proj_x');
     expect(client.publishDoc).toHaveBeenCalled();
     const content = await readFile(r.casePath, 'utf-8');
     expect(content).toContain('<h2>1 · 目标</h2>');
@@ -75,6 +77,7 @@ describe('case_create', () => {
       {
         projectPath: dir,
         slug: 'linked',
+        projectId: 'proj_x',
         goal: 'g',
         whatHappened: 'w',
         criteriaResults: [{ criterion: 'c', met: true }],
@@ -92,6 +95,7 @@ describe('case_create', () => {
     const args = {
       projectPath: dir,
       slug: 'feed-latency',
+      projectId: 'proj_x',
       goal: 'g',
       whatHappened: 'first run',
       criteriaResults: [{ criterion: 'c', met: true }],

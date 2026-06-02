@@ -3,9 +3,9 @@
 Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + Feishu.
 
 - **`@tcmcp/remote`** — 10 tools · HTTP/SSE at `mcp.teamctx.actionow.ai/mcp` · runs on Zeabur (project `teamctx`) · pulls config + secrets from a multica `mcp-server` integration (live, reactive to rotation)
-- **`@tcmcp/local`** — 12 tools · stdio · spawned by Claude Code / Codex CLI inside the user's repo checkout · git + file ops only
+- **`@tcmcp/local`** — 13 tools · stdio · spawned by Claude Code / Codex CLI inside the user's repo checkout · git + file ops only
 
-22 tools total. Architecture is hybrid because some SOP gates (`plan_create`, `case_create`, `session_handoff` …) need access to the user's working tree and `git`, while broadcast / DM / Wiki / METR-decision tools have no local dependency and benefit from a single server-side process owning Feishu tokens.
+23 tools total. Architecture is hybrid because some SOP gates (`plan_create`, `case_create`, `session_handoff` …) need access to the user's working tree and `git`, while broadcast / DM / Wiki / METR-decision tools have no local dependency and benefit from a single server-side process owning Feishu tokens.
 
 ## Architecture
 
@@ -58,16 +58,16 @@ Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + F
 | `search_chat` | Search Feishu workspace chats (maintenance helper). |
 | `read_member_dm` | Read recent P2P history for one team member (used by burnout collect). |
 
-### Local (12 · stdio · need git + filesystem)
+### Local (13 · stdio · need git + filesystem)
 
 Gate · 守门 6 (SOP non-negotiable #1 #2):
 
 | Tool | Purpose |
 | --- | --- |
-| `plan_create` | Generate plan markdown + multica plan-draft issue. |
+| `plan_create` | Generate plan HTML doc + multica plan-draft issue (doc → issue **comment** · requires `projectId`). |
 | `plan_approve` | The SOP non-negotiable #1 gate. |
 | `plan_upgrade` | Bump plan version (v1.x) + snapshot + re-review. |
-| `case_create` | Generate debrief case file (5 mandatory sections). |
+| `case_create` | Generate debrief case file (5 mandatory sections) + 复盘 issue (doc → **comment** · requires `projectId`). |
 | `case_review` | Section 4 review gate — refuses trivial Key judgments, signs + labels. |
 | `case_promote_rule` | Promote a rule from a case file to CLAUDE.md. |
 
@@ -85,14 +85,17 @@ Observe · 健康度 2 (monthly review):
 | `skill_lint` | Token + owner + 90-day staleness checks. |
 | `monthly_health_report` | SOP-aligned monthly health snapshot. |
 
-Safety · 红线 2 (PB-04 + RPI):
+Safety · 红线 + RPI/doc · 3:
 
 | Tool | Purpose |
 | --- | --- |
 | `autopilot_lint` | PB-04 guardrails + budget cap enforcement. |
-| `research_create` | RPI Research session skeleton at `docs/research/`. |
+| `research_create` | RPI Research session skeleton at `docs/research/` (creates issue + local skeleton · requires `projectId`). |
+| `doc_publish` | Publish a local HTML doc to an issue as an append-only **comment** (`!file` inline render) — fills a research skeleton or posts any new doc version. |
 
-> Drift note from the plan: Plan-5 quoted "21 = 9 remote + 12 local". After M-12 added `read_member_dm`, the actual remote count is **10**, so 22 total. Both servers' `tools/list` agree.
+> **Doc model:** plan / research / case docs are uploaded + posted as append-only issue **comments** (`!file` inline render), never the issue description (attachments are immutable · the CLI can't re-upload). Updates are new comments (`plan_upgrade`, `doc_publish`). Create tools require `projectId` — **every issue lives under a project**.
+
+> Drift note: Plan-5 quoted "21 = 9 remote + 12 local". M-12 added `read_member_dm` (remote → 10, total 22); later `doc_publish` added (local → **13**, total **23**). Both servers' `tools/list` agree.
 
 ## Install · Deploy
 
