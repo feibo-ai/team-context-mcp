@@ -3,8 +3,10 @@
 //
 // Local tools are file-system + git heavy (plan/case/research/skill_lint etc).
 // They run in the developer's checkout where files live; no remote transport.
-// Mirrors the old root src/server.ts but registers only the 12 tools that
-// stayed local. The 5 remote-capable tools moved to @tcmcp/remote.
+// Mirrors the old root src/server.ts but registers only the 13 tools that
+// stayed local; the remote-capable tools moved to @tcmcp/remote.
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -236,9 +238,25 @@ export function zodToJsonSchema(s: z.ZodTypeAny): unknown {
   return {};
 }
 
-// Only run main() when executed directly (not when imported by tests) —
-// mirrors @tcmcp/remote/src/server.ts.
-if (import.meta.url === `file://${process.argv[1] ?? ''}`.replace(/\\/g, '/')) {
+// True when this module is the process entrypoint, false when imported by a
+// test — mirrors @tcmcp/remote/src/server.ts. Compare REAL paths on both sides:
+// Node resolves import.meta.url to the module's realpath, but process.argv[1]
+// stays as typed, so a symlinked launch path (a config pointing at a symlinked
+// dist/server.js) made the old `import.meta.url === file://argv[1]` compare
+// fail — main() never ran and the server registered zero tools. realpathSync
+// collapses the symlink (and sidesteps the %20-encoding pitfall of building a
+// file:// string by hand).
+function isMainModule(): boolean {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argv1);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
