@@ -17,6 +17,8 @@
 
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import type { z } from 'zod';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -545,12 +547,24 @@ async function main(): Promise<void> {
   });
 }
 
-// Only run main() when executed directly (not when imported as a module by
-// tests). Detect via `import.meta.url` matching argv[1].
-if (
-  import.meta.url ===
-  `file://${process.argv[1] ?? ''}`.replace(/\\/g, '/')
-) {
+// True when this module is the process entrypoint, false when imported as a
+// module by tests — mirrors @tcmcp/local/src/server.ts. Compare REAL paths on
+// both sides: Node resolves import.meta.url to the module's realpath, but
+// process.argv[1] stays as typed, so a symlinked launch path made the old
+// `import.meta.url === file://argv[1]` compare fail — main() never ran and the
+// server registered zero tools. realpathSync collapses the symlink (and
+// sidesteps the %20-encoding pitfall of building a file:// string by hand).
+function isMainModule(): boolean {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argv1);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   main().catch((err) => {
     process.stderr.write(`${err}\n`);
     process.exit(1);
