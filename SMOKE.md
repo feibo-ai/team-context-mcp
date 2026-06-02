@@ -51,16 +51,16 @@ Pipe the same three frames into `node packages/local/dist/server.js`:
 ) | node packages/local/dist/server.js
 ```
 
-Result: **12 tools** listed. Names exactly:
+Result: **13 tools** listed. Names exactly:
 
 ```
 plan_create, plan_approve, plan_upgrade,
 case_create, case_review, case_promote_rule,
 session_handoff, project_kickoff, research_create,
-skill_lint, monthly_health_report, autopilot_lint
+doc_publish, skill_lint, monthly_health_report, autopilot_lint
 ```
 
-Combined: **22 tools** across both servers — what the user should see in
+Combined: **23 tools** across both servers — what the user should see in
 Claude Code's "tools" picker.
 
 ## Round-trip 2 — `plan_create` (local · gate phase)
@@ -138,7 +138,7 @@ pnpm -r test
 
 ## What's NOT covered here
 
-- **Real multica server round-trip** for the local 12 tools — all tests use
+- **Real multica server round-trip** for the local 13 tools — all tests use
   undici MockAgent. Integration smoke for `multica skill import` /
   `multica autopilot apply` lives in `team-context/standards/multica-sync-results.md`.
 - **Real Feishu push** — `notify_team` / `dm_member` / `archive_to_wiki` /
@@ -150,4 +150,4 @@ pnpm -r test
   tool; per-tool authorization is not in v0.2.
 - **GUI session manual test** — a second human (any team member opening Claude
   Code wired to the DRI's URL) should ask "What tools do you have from
-  tcmcp-remote and tcmcp-local?" and see 22 across the two servers.
+  tcmcp-remote and tcmcp-local?" and see 23 across the two servers.

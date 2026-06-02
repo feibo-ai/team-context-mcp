@@ -66,8 +66,8 @@ multica's secret store and stream in over the control-plane WebSocket.
 | `INTEGRATION_NAME` | `team-context-mcp` | which multica integration to read |
 | `INTEGRATION_KIND` | `mcp-server` | shrinks the integration list query |
 
-- `version` in `/health` comes from `ZEABUR_GIT_COMMIT_SHA` (auto-injected by Zeabur),
-  falling back to `GIT_SHA` if set — so `/health` reports the live commit.
+- `version` in `/health` comes from `GIT_SHA` if explicitly set, otherwise
+  `ZEABUR_GIT_COMMIT_SHA` (auto-injected by Zeabur) — so `/health` reports the live commit.
 - A legacy `PORT=8443` var may still be set; the app does **not** read it (it binds
   `MCP_HTTP_PORT`). It's a no-op and can be removed to avoid confusion.
 

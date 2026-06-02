@@ -13,8 +13,8 @@ You need only the local stdio server. The remote is already running at
 
 Two values you provide yourself:
 - **Remote MCP URL** — `https://mcp.teamctx.actionow.ai/mcp`
-- **Your personal multica bearer token** — the same JWT you use for the multica CLI;
-  copy from `~/.multica/token` or run `multica auth token`
+- **Your personal multica bearer token** — the same token the multica CLI uses;
+  run `multica login`, then copy the `token` field from `~/.multica/config.json`
 
 ### 1. Clone + build the local server
 
@@ -44,7 +44,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 }
 ```
 
-Replace `<your-multica-token>` and `<you>` with your values. The remote URL and the local path are independent — failing to reach the remote server only disables the 10 Feishu/SOP-broadcast tools (you'll see them missing from `tools/list`); the 12 local git/file tools still work.
+Replace `<your-multica-token>` and `<you>` with your values. The remote URL and the local path are independent — failing to reach the remote server only disables the 10 Feishu/SOP-broadcast tools (you'll see them missing from `tools/list`); the 13 local git/file tools still work.
 
 ### 3. Wire into Codex CLI (optional)
 
@@ -58,7 +58,7 @@ codex mcp add-http tcmcp-remote https://mcp.teamctx.actionow.ai/mcp \
 
 Restart Claude Code / Codex. Ask "What tools do you have from tcmcp-remote and tcmcp-local?"
 
-Expected: **22 tools** total — 10 from `tcmcp-remote`, 12 from `tcmcp-local`. See [README.md](./README.md) for the breakdown.
+Expected: **23 tools** total — 10 from `tcmcp-remote`, 13 from `tcmcp-local`. See [README.md](./README.md) for the breakdown.
 
 ---
 
@@ -174,7 +174,7 @@ If `multica_control_plane_enabled` is `false`: revisit the Pre-flight section. I
 multica issue create \
   --project team-context-mcp \
   --title "tcmcp-remote is live · v0.2" \
-  --body "URL: https://mcp.teamctx.actionow.ai/mcp · Each member runs \`multica auth token\` for their bearer · See INSTALL.md team-member path."
+  --body "URL: https://mcp.teamctx.actionow.ai/mcp · Each member runs \`multica login\` for their bearer · See INSTALL.md team-member path."
 ```
 
 ---
