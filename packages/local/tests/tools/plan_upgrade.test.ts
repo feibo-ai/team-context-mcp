@@ -140,4 +140,22 @@ describe('plan_upgrade', () => {
     const note = (client.commentOnIssue as ReturnType<typeof vi.fn>).mock.calls[0][1];
     expect(note).toMatch(/发布失败/);
   });
+
+  it('planInput 形状不全(缺 goal)→ 抛明确校验错,而不是渲染深处崩在 reading "replace"', async () => {
+    const client = spyClient();
+    // 旧版:planInput=z.any() 放行 → renderPlanHtml 里 esc(input.goal=undefined)
+    // → "Cannot read properties of undefined (reading 'replace')"(晦涩)。
+    // 现在 planInput 受 planCreateInput 校验,缺 goal 直接 zod 报错。
+    await expect(planUpgrade(
+      {
+        planPath: join(dir, 'plan_x.html'),
+        multicaIssueId: 'issue_p1',
+        reason: 'realized X was wrong, need to redo Y',
+        version: 2,
+        // deliberately missing `goal`
+        planInput: { projectPath: dir, slug: 'x', layer: 'project', completionCriteria: ['c'] } as never,
+      },
+      { client },
+    )).rejects.toThrow(/goal/i);
+  });
 });

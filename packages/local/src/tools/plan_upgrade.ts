@@ -2,15 +2,19 @@ import { writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import type { MulticaClient } from '@tcmcp/shared';
 import { renderPlanHtml } from '../render/plan-html.js';
-import type { PlanCreateInput } from './plan_create.js';
+import { planCreateInput, type PlanCreateInput } from './plan_create.js';
 
 export const planUpgradeInput = z.object({
   planPath: z.string(),
   multicaIssueId: z.string(),
   reason: z.string().min(10),
   // Full structured plan fields, supplied so the HTML can be regenerated
-  // wholesale. Typed as PlanCreateInput on the inferred type below.
-  planInput: z.any().optional(),
+  // wholesale. VALIDATED against planCreateInput (minus projectId — the issue
+  // already lives under a project; plan_upgrade only regenerates the doc). The
+  // old `z.any()` let a malformed shape through → renderPlanHtml crashed on
+  // esc(undefined) with a cryptic "reading 'replace'". Now a missing field
+  // (goal/slug/layer/…) yields a clear zod error instead.
+  planInput: planCreateInput.omit({ projectId: true }).optional(),
   // New attachment version number (default 2). v1, v2... accumulate on the
   // issue so the plan's evolution stays traceable. This is the single source of
   // version truth — there is no separate local snapshot/frontmatter scheme.
@@ -18,7 +22,7 @@ export const planUpgradeInput = z.object({
 });
 
 export type PlanUpgradeInput = Omit<z.infer<typeof planUpgradeInput>, 'planInput'> & {
-  planInput?: PlanCreateInput;
+  planInput?: Omit<PlanCreateInput, 'projectId'>;
 };
 
 export interface PlanUpgradeOutput {

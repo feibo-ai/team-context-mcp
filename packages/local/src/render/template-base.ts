@@ -2,8 +2,11 @@
 // 跑在 multica issue 的 sandboxed iframe(allow-scripts · opaque origin)里。
 // 样例见 /tmp/html-templates/A-letterpress.html。
 
-export function esc(s: string): string {
-  return s
+export function esc(s: string | null | undefined): string {
+  // null-safe: callers may pass an undefined/missing field (e.g. a planInput
+  // whose shape doesn't match), and `undefined.replace(…)` throws the cryptic
+  // "Cannot read properties of undefined (reading 'replace')". Coerce first.
+  return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

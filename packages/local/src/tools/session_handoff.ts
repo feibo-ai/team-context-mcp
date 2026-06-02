@@ -5,7 +5,7 @@ import { GitOps } from '@tcmcp/shared';
 import { upsertSection } from '@tcmcp/shared';
 import type { MulticaClient } from '@tcmcp/shared';
 import { renderPlanHtml, type HandoffState } from '../render/plan-html.js';
-import type { PlanCreateInput } from './plan_create.js';
+import { planCreateInput, type PlanCreateInput } from './plan_create.js';
 
 export const sessionHandoffInput = z.object({
   projectPath: z.string(),
@@ -18,14 +18,16 @@ export const sessionHandoffInput = z.object({
   wipMessage: z.string().optional(),
   multicaIssueId: z.string().optional(),
   confirmDiscard: z.boolean().optional(),
-  // Optional: full structured plan. When provided (with multicaIssueId), the
-  // plan HTML is regenerated, the local .html is overwritten, and a NEW
-  // attachment is appended — comment behavior stays unchanged.
-  planInput: z.any().optional(),
+  // Optional: full structured plan, VALIDATED against planCreateInput (minus
+  // projectId). When provided (with multicaIssueId) the plan HTML is
+  // regenerated, the local .html is overwritten, and a NEW versioned comment is
+  // appended. (The old `z.any()` let a bad shape crash renderPlanHtml on
+  // esc(undefined); now a missing field yields a clear zod error.)
+  planInput: planCreateInput.omit({ projectId: true }).optional(),
 });
 
 export type SessionHandoffInput = Omit<z.infer<typeof sessionHandoffInput>, 'planInput'> & {
-  planInput?: PlanCreateInput;
+  planInput?: Omit<PlanCreateInput, 'projectId'>;
 };
 
 export interface SessionHandoffOutput {
