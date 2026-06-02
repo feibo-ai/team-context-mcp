@@ -17,7 +17,9 @@ export interface HandoffState {
   pollutionSignal: string;
 }
 
-export function renderPlanHtml(input: PlanCreateInput, handoff?: HandoffState): string {
+// projectId is omitted: it's an issue-level field the renderer never uses, and
+// plan_upgrade / session_handoff regenerate a plan doc without re-supplying it.
+export function renderPlanHtml(input: Omit<PlanCreateInput, 'projectId'>, handoff?: HandoffState): string {
   const crit = (input.completionCriteria ?? []).map((c) => `<li>${esc(c)}</li>`).join('');
   const exec = (input.exec ?? []).join(', ') || '(未分配)';
   const collab = (input.collab ?? []).join(', ') || '(无)';

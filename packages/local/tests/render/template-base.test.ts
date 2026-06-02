@@ -6,6 +6,13 @@ describe('template-base', () => {
     expect(esc('<a> & "b" \'c\'')).toBe('&lt;a&gt; &amp; &quot;b&quot; &#39;c&#39;');
   });
 
+  it('esc 对 undefined/null 安全 · 返回空串(不 undefined.replace 崩)', () => {
+    // 渲染器有未兜底字段(如 esc(input.goal));planInput 形状不全时旧 esc 会
+    // undefined.replace → "Cannot read properties of undefined (reading 'replace')"。
+    expect(esc(undefined)).toBe('');
+    expect(esc(null)).toBe('');
+  });
+
   it('renderShell 产出自包含 HTML · 含标题/eyebrow/section · 系统字体无外链', () => {
     const html = renderShell({
       eyebrow: 'PLAN · 计划',
