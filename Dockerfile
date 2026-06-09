@@ -28,7 +28,6 @@ COPY packages/shared/package.json   packages/shared/
 COPY packages/config/package.json   packages/config/
 COPY packages/feishu/package.json   packages/feishu/
 COPY packages/remote/package.json   packages/remote/
-COPY packages/local/package.json    packages/local/
 
 # Full install including dev deps · we need tsc to build.
 RUN pnpm install --frozen-lockfile

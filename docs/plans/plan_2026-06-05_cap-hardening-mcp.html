@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cap-hardening-mcp</title>
+<style>
+:root{--ink:#1A1A1A;--ink2:#2D2D2D;--paper:#F5F2EB;--paper2:#EDE8DC;--accent:#C73E1D;--gray:#8B8680;--border:#D4CFC4;--green:#4A6B3A;--gold:#B8862E}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Songti SC","Noto Serif SC",Georgia,serif;background:var(--paper);color:var(--ink);line-height:1.8;font-size:15px;padding:48px 40px;max-width:760px;margin:0 auto}
+.eyebrow{font-family:"SF Mono",Menlo,monospace;font-size:11px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:14px}
+h1{font-weight:900;font-size:40px;line-height:1.15;letter-spacing:-1px;margin-bottom:18px;border-bottom:3px double var(--ink);padding-bottom:20px}
+.meta{display:flex;gap:32px;flex-wrap:wrap;font-family:"SF Mono",Menlo,monospace;font-size:12px;color:var(--gray);margin-bottom:36px}
+.meta b{color:var(--ink);font-weight:600}
+h2{font-weight:700;font-size:22px;margin:36px 0 14px;padding-left:14px;border-left:4px solid var(--accent)}
+.field{background:#fff;border:1px solid var(--border);padding:18px 22px;margin-bottom:14px}
+.field-label{font-family:"SF Mono",Menlo,monospace;font-size:10px;letter-spacing:1.5px;color:var(--gray);text-transform:uppercase;margin-bottom:6px}
+ul{list-style:none;margin:8px 0}
+li{padding:6px 0 6px 24px;position:relative}
+li::before{content:"▸";position:absolute;left:4px;color:var(--accent)}
+.crit li::before{content:"☐";color:var(--green)}
+code{font-family:"SF Mono",Menlo,monospace;background:var(--paper2);padding:1px 6px;border-radius:2px;font-size:13px}
+.callout{background:var(--paper2);border-left:4px solid var(--gold);padding:14px 18px;margin:18px 0;font-size:14px}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--border);font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--gray)}
+</style></head>
+<body>
+<div class="eyebrow">PLAN · 计划 · project · ⚠️ 部分作废</div>
+<h1>cap-hardening-mcp</h1>
+<div class="callout"><b>⚠️ 部分作废 —— @tcmcp/local 随迭代2 删除；本 plan 的工具扩展若仍要做，仅适用于 @tcmcp/remote。</b> 本 plan 主张给本仓再加 ≤8 个 MCP 工具，与「@tcmcp/local 整包删除」的方向冲突：落在 local 的工作项（如 component_catalog 的 local 选项、复用 plan_approve / skill_lint 等 local 工具的部分）一律不再适用；仅 remote 侧（MulticaClient 薄封装、design_review 走 remote 等）若评估后仍有价值才执行。RPI 文档流（plan/research/case/handoff）已迁至 team-context skills/tc-render + multica CLI。
+<div class="meta"><span>DRI <b>待 kickoff 认领</b></span><span>Layer <b>project</b></span><span>Appetite <b>约 6–8 人天纯本仓工时（不含跨仓等待）。波次1：design_review 0.5 天（零依赖、先 ship）+ delivery_metrics 1–1.5 天（端点 curl 通后）→ 波次3 去重/打标/拆任务 1.5–2 天 → 波次4 日志/根因 1.5 天 → 波次5 组件目录 1 天。硬约束：对应 tc-multica 端点未就绪就跳过该波次、不空转写 mock。</b></span></div>
+<h2>目标</h2><div class="field"><div class="field-label">Goal</div>在 team-context-mcp（三仓中间的薄门面层）为 6 大能力补强 + 设计检查点新增/复用 ≤8 个 MCP 工具，每个都是对 tc-multica 对应端点的薄封装——业务逻辑（度量/去重/根因）一律留 tc-multica、绝不下沉本仓。波次重排后按：波次1 design_review（零依赖先 ship）+ delivery_metrics（端点 ready 后）→ 波次3 去重(对接 pg_bigm)/打标/拆任务 → 波次4 日志/根因 → 波次5 组件目录。</div>
+<h2>完成标准</h2><div class="field crit"><ul><li>每个新工具在对应 server 的 tools/list 出现且 inputSchema.type===&#39;object&#39;（过 input-schema.test.ts，顶层不得 emit oneOf）</li><li>每个新工具有 handler 单测，用 mock 打桩 tc-multica 端点、不真连后端；CI build-test 全绿</li><li>薄门面纪律=结构性判据：每个新 handler 内无 sort/截断/算分/embedding 调用，仅『校验入参→MulticaClient.req(/api/...)→透传』；需访问 tc-multica 数据的方法都落 packages/shared/src/multica-client.ts（行数仅软参考，非判据）</li><li>design_review 走 remote、不落本地 HTML：复用 plan_request_review 的 label+comment，『设计-已选型』终态用 remote 的 MulticaClient.addLabel/removeLabel/updateIssue 重写（不复用 local 的 plan_approve），能在设计 issue 上跑通三态机</li><li>delivery_metrics 启动前 tc-multica 端点须可 curl 通（非仅书面锁 schema）；端点未就绪则只写 mock 占位不合并空壳；README 工具表 + local/remote/total 计数同步（当前 23）</li></ul></div>
+<h2>分工</h2><div class="field"><div class="field-label">Roles</div>DRI <code>待 kickoff 认领</code> · EXEC <code>Claude Code（Implement 会话）</code> · COLLAB <code>(无)</code> · REVIEW <code>第二个 Claude session（staff-eng 角色）</code></div>
+<h2>投入预算</h2><div class="callout"><b>约 6–8 人天纯本仓工时（不含跨仓等待）。波次1：design_review 0.5 天（零依赖、先 ship）+ delivery_metrics 1–1.5 天（端点 curl 通后）→ 波次3 去重/打标/拆任务 1.5–2 天 → 波次4 日志/根因 1.5 天 → 波次5 组件目录 1 天。硬约束：对应 tc-multica 端点未就绪就跳过该波次、不空转写 mock。</b> · 超时触发 plan_upgrade(升版强制重审)。</div>
+<h2>方案</h2><div class="field">## 仓库角色
+team-context-mcp 是三仓【中间薄门面层】——把 tc-multica 长出的端点包成 agent 与 autopilot 能调的 MCP 工具，自身不实现业务逻辑。现有 23 工具 = local 13 + remote 10。
+
+## v1.1 变更摘要（评审 3 blocker）
+- design_review transport 纠正：plan_request_review 在 remote、plan_approve 在 **local 且做本地文件 I/O**，跨 transport 无法单工具复用 → 定走 remote 不落本地 HTML。
+- 波次重排：零依赖的 design_review 提到 delivery_metrics 前，给夹心层不空转的起点。
+- 薄门面判据改结构性；松绑飞书措辞；delivery_metrics 加端点可 curl 通 gate；dedup 改对接 pg_bigm。
+
+## 薄门面第一纪律（判据=结构性，非行数）
+度量/去重/根因/打标逻辑留 tc-multica，本仓只透传。判据：**handler 内无 sort/截断/算分/embedding 调用**（行数是软参考——should_i_use_ai/betting_table_capture 也在 remote 且超 60 行，remote≠thin）。划分：聚合多源/操作 issue/需飞书→remote；只读本地代码产物→local。注意『remote』是常驻/transport 概念，TCM-1/3/4/5/6/7 只需 MulticaClient、不需 FeishuClient，落 remote 的真实理由是『常驻独占 token + 面向全工作区』。
+
+## 工作项分解（波次重排：design_review 提前）
+
+### TCM-2 design_review · 设计检查点 · 波次1（提前·零跨仓依赖）· remote ★改
+**走 remote、不落本地 HTML**（评审：plan_approve 在 local 且 readFile/writeFile planPath，复用会被钉死 local）。复用 plan_request_review 的 label+comment 那半（打 设计-评审中 + 贴评审 prompt）；『设计-已选型』终态在 remote 用 MulticaClient.addLabel/removeLabel/updateIssue 重写（不复用 plan_approve）。作为夹心层不依赖 tc-multica 也能 ship 的第一个真工具。
+依赖：无跨仓后端；前置=multica 先 label create 出 设计-草稿/评审中/已选型。验收：设计 issue 上跑通三态机。
+
+### TCM-1 delivery_metrics · P0 · 波次1（端点 ready 后插入）· remote ★加 gate
+拉 tc-multica GET /api/dashboard/delivery/*，薄透传给周报 autopilot。MulticaClient 加 getDeliveryMetrics。**硬 gate：启动前端点须可 curl 通（非仅书面锁 schema）**，否则只 mock 占位、不合并。不与 monthly_health_report（local 报告生成器）混。
+依赖：tc-multica P0 端点。风险：mock 按约定 schema 写、真实 schema 漂移会绿着炸（历史 content vs body 坑）。
+
+### TCM-3 dedup_issues · P1 · 波次3 · remote ★改依赖
+暴露 tc-multica 去重端点。**后端改走 pg_bigm（非 pgvector）**，本仓仍只透传 findDuplicates。依赖：tc-multica W5 pg_bigm 去重端点。风险：相似度阈值留 tc-multica。
+
+### TCM-4 autolabel_issue · P1 · 波次3 · remote
+暴露打标端点，MulticaClient 加 suggestLabels/applyAutoLabels（区别于按名打单 label 的 addLabel）。依赖 tc-multica P1 打标后端。
+
+### TCM-5 split_subtasks · P1 · 波次3 · remote
+暴露拆子任务端点（后端用 parent_issue_id 拆解、本仓透传子 id）。依赖 tc-multica P1 拆任务后端。
+
+### TCM-6 search_logs · P2 · 波次4 · remote
+暴露日志检索（issue/run/时间窗/关键词）。依赖 tc-multica P2 可观测端点。分页/截断后端做。
+
+### TCM-7 root_cause · P2 · 波次4 · remote
+暴露根因分析，与 search_logs 配套（排其后）。依赖 tc-multica P2 根因端点。
+
+### TCM-8 component_catalog · P3 · 波次5 · local（优先）/remote（备选）
+暴露 tc-multica 生成的 packages/ui 组件清单。判定取决于『清单是本地文件还是服务端 API』（本地文件→local 随 skill_lint，API→remote）；默认 local。
+
+## 开工前确认项
+1. 薄门面结构性判据（无 sort/截断/算分/embedding），非行数。
+2. 跨仓时序：delivery_metrics 等加『端点可 curl 通』gate；其余端点没就绪就跳过该波次、不空转写 mock。
+3. design_review 已定：走 remote 不落本地 HTML（终态 label remote 重写、不复用 plan_approve）。
+4. delivery_metrics ≠ monthly_health_report（两条线两 server）。
+5. component_catalog local/remote 取决于清单是文件还是 API（默认 local）。
+6. schema 暗坑：顶层 union 不 emit oneOf，保持 type:object 过 input-schema.test.ts。
+7. label 前置：打新 label 工具依赖 multica 先 label create。
+8. snake_case 字段陷阱（content 非 body、description 非 body、parent_issue_id）。
+9. README/计数同步（当前 23）。</div>
+
+<footer>team-context · RPI Plan phase · multica issue 内渲染</footer>
+</body></html>

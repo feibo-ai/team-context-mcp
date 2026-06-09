@@ -1,5 +1,7 @@
 # team-context-mcp v0.2 (control plane edition)
 
+> ⚠️ **REMOVED — @tcmcp/local 已删除(迭代2)**。RPI 文档流（plan/research/case/handoff 生成+内联渲染）已迁至 team-context `skills/tc-render/publish.py` + `multica` CLI（`skill pull`/`skill lint`/`issue comment add --inline`）。本包仅 @tcmcp/local 删除；@tcmcp/remote 保留。
+
 Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + Feishu.
 
 - **`@tcmcp/remote`** — 10 tools · HTTP/SSE at `mcp.teamctx.actionow.ai/mcp` · runs on Zeabur (project `teamctx`) · pulls config + secrets from a multica `mcp-server` integration (live, reactive to rotation)
@@ -59,6 +61,18 @@ Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + F
 | `read_member_dm` | Read recent P2P history for one team member (used by burnout collect). |
 
 ### Local (13 · stdio · need git + filesystem)
+
+> ⚠️ **DEPRECATED · 已删除 — replacement map**（下表 13 工具均不再用，改走 team-context skills + `multica` CLI）：
+>
+> | 旧 local 工具 | 新替代 |
+> | --- | --- |
+> | `doc_publish` / `plan_create` / `research_create` / `case_create` / `session_handoff` / `plan_upgrade` | team-context `skills/tc-render/publish.py`（render + 硬校验 + 命门A 内联发布）；命门B = `multica issue comment add --inline` |
+> | `skill_lint` | `multica skill lint` |
+> | skill 自更新 | `multica skill pull` |
+> | `plan_approve` / `case_review` | skill 调 `multica` CLI（issue label / status） |
+> | `project_kickoff` | `tc-1-start` skill |
+> | `case_promote_rule` | `tc-5-review` prose |
+> | `monthly_health_report` / `autopilot_lint` | `tc-ops` 脚本 |
 
 Gate · 守门 6 (SOP non-negotiable #1 #2):
 

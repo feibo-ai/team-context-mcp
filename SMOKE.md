@@ -1,5 +1,7 @@
 # SMOKE — end-to-end MCP round-trips (v0.2)
 
+> ⚠️ **DEPRECATED 提示 — local 13 工具已删除。** 本文档中凡涉及 `@tcmcp/local` 的 13 工具与 "23 tools" 基线的部分（Round-trip 1b / 2 / 4 / 5、Aggregate、What's NOT covered 的 local 行）**仅作历史记录**：这些工具已迁至 team-context skills + `multica` CLI，迭代2 随整包删除。`@tcmcp/remote`（10 工具）部分仍然有效保留。
+
 Verified against the v0.2 hybrid build: `@tcmcp/remote` over HTTP/SSE on `:8443/mcp`
 and `@tcmcp/local` over stdio. MCP protocol version `2024-11-05`.
 
@@ -60,8 +62,10 @@ session_handoff, project_kickoff, research_create,
 doc_publish, skill_lint, monthly_health_report, autopilot_lint
 ```
 
+> ⚠️ **DEPRECATED — 这 13 个 local 工具已删除，本节 local 部分仅历史。** 替代见 README 的 replacement map（tc-render `publish.py` / `multica skill lint` / `multica skill pull` / `multica issue comment add --inline` / tc-1-start / tc-5-review / tc-ops）。
+
 Combined: **23 tools** across both servers — what the user should see in
-Claude Code's "tools" picker.
+Claude Code's "tools" picker（**注：23 = 10 remote + 13 local；迭代2 后 local 13 删除，只剩 remote 10**）.
 
 ## Round-trip 2 — `plan_create` (local · gate phase)
 
