@@ -1,6 +1,6 @@
 # team-context-mcp v0.2 (control plane edition)
 
-> ⚠️ **DEPRECATED — @tcmcp/local 迭代2 整包删除**。RPI 文档流（plan/research/case/handoff 生成+内联渲染）已迁至 team-context `skills/tc-render/publish.py` + `multica` CLI（`skill pull`/`skill lint`/`issue comment add --inline`）。本包仅 @tcmcp/local 删除；@tcmcp/remote 保留。
+> ⚠️ **REMOVED — @tcmcp/local 已删除(迭代2)**。RPI 文档流（plan/research/case/handoff 生成+内联渲染）已迁至 team-context `skills/tc-render/publish.py` + `multica` CLI（`skill pull`/`skill lint`/`issue comment add --inline`）。本包仅 @tcmcp/local 删除；@tcmcp/remote 保留。
 
 Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + Feishu.
 
@@ -62,7 +62,7 @@ Hybrid MCP server pair enforcing AI MIQ SOP v0.4 workflow over multica + git + F
 
 ### Local (13 · stdio · need git + filesystem)
 
-> ⚠️ **DEPRECATED · 迭代2 整包删除 — replacement map**（下表 13 工具均不再用，改走 team-context skills + `multica` CLI）：
+> ⚠️ **DEPRECATED · 已删除 — replacement map**（下表 13 工具均不再用，改走 team-context skills + `multica` CLI）：
 >
 > | 旧 local 工具 | 新替代 |
 > | --- | --- |

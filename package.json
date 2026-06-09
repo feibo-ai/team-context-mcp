@@ -8,7 +8,6 @@
     "build": "pnpm -r --filter './packages/*' build",
     "test": "pnpm -r --filter './packages/*' test",
     "typecheck": "pnpm -r --filter './packages/*' typecheck",
-    "dev:local": "pnpm --filter @tcmcp/local dev",
     "dev:remote": "pnpm --filter @tcmcp/remote dev",
     "docker:build": "docker build -t tcmcp:dev ."
   },
