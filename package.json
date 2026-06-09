@@ -1,6 +1,6 @@
 {
   "name": "team-context-mcp",
-  "version": "0.2.0-rc1",
+  "version": "0.3.0",
   "description": "MCP server enforcing AI MIQ SOP v0.4 workflow over multica + git",
   "private": true,
   "type": "module",
