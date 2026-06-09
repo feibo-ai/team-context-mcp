@@ -44,7 +44,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'plan_create',
     description:
-      'Create a new plan markdown + multica 计划-草稿 issue. SOP P-3 Phase 01 step 3.',
+      'DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py) Create a new plan markdown + multica 计划-草稿 issue. SOP P-3 Phase 01 step 3.',
     schema: planCreateInput,
     handler: (i, d) => planCreate(i as z.infer<typeof planCreateInput>, d),
   },
@@ -57,14 +57,14 @@ const TOOLS: ToolDef[] = [
   {
     name: 'plan_upgrade',
     description:
-      'Snapshot current plan version and bump (v1.0 → v1.1). Re-labels for review.',
+      'DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py) Snapshot current plan version and bump (v1.0 → v1.1). Re-labels for review.',
     schema: planUpgradeInput,
     handler: (i, d) => planUpgrade(i as z.infer<typeof planUpgradeInput>, d),
   },
   {
     name: 'case_create',
     description:
-      'Create debrief case file with 5 SOP sections. Non-negotiable #2.',
+      'DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py) Create debrief case file with 5 SOP sections. Non-negotiable #2.',
     schema: caseCreateInput,
     handler: (i, d) => caseCreate(i as z.infer<typeof caseCreateInput>, d),
   },
@@ -85,7 +85,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'session_handoff',
     description:
-      'Pre-clear / restart handoff: commit WIP + update plan Current State.',
+      'DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py) Pre-clear / restart handoff: commit WIP + update plan Current State.',
     schema: sessionHandoffInput,
     handler: (i, d) =>
       sessionHandoff(i as z.infer<typeof sessionHandoffInput>, d),
@@ -100,7 +100,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'research_create',
-    description: 'RPI Research phase skeleton + multica 研究 issue. Creates the issue + a LOCAL skeleton file only — it does NOT upload a doc (the skeleton has no findings). After you fill the local HTML, publish it with doc_publish (a comment).',
+    description: 'DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py) RPI Research phase skeleton + multica 研究 issue. Creates the issue + a LOCAL skeleton file only — it does NOT upload a doc (the skeleton has no findings). After you fill the local HTML, publish it with doc_publish (a comment).',
     schema: researchCreateInput,
     handler: (i, d) =>
       researchCreate(i as z.infer<typeof researchCreateInput>, d),
@@ -108,7 +108,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'doc_publish',
     description:
-      'Publish a local HTML doc (e.g. filled research findings) to a multica issue as an append-only COMMENT that embeds it via !file (renders inline). Use this to fill a research_create skeleton or post any new doc version. NEVER try to update an attachment (the CLI can only download) or rewrite the issue description.',
+      'DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py) Publish a local HTML doc (e.g. filled research findings) to a multica issue as an append-only COMMENT that embeds it via !file (renders inline). Use this to fill a research_create skeleton or post any new doc version. NEVER try to update an attachment (the CLI can only download) or rewrite the issue description.',
     schema: docPublishInput,
     handler: (i, d) => docPublish(i as z.infer<typeof docPublishInput>, d),
   },

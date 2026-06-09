@@ -8,6 +8,8 @@ stdio server and point your client at the always-on remote URL.
 
 ## Team members (most people · light path)
 
+> ⚠️ **DEPRECATED — @tcmcp/local 迭代2 起不再需要安装。** 下面 13 个 local 工具（plan/research/case/handoff/skill_lint 等）已全部迁出本包：RPI 文档流改用 team-context 的 **skills + `multica` CLI**——用 `multica skill pull --all` 拉取 skill，文档生成+内联发布走 `skills/tc-render/publish.py`（命门B = `multica issue comment add --inline`），skill lint 走 `multica skill lint`。**本节只保留 `@tcmcp/remote`（10 工具）的接入步骤；不要再 clone/build/wire `@tcmcp/local`。** （边界：删除范围仅 @tcmcp/local；@tcmcp/remote 保留。）
+
 You need only the local stdio server. The remote is already running at
 `https://mcp.teamctx.actionow.ai`.
 

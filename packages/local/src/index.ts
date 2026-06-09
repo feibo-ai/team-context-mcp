@@ -1,5 +1,6 @@
 // @tcmcp/local — public surface
-// Local MCP server (stdio transport, 12 SOP workflow tools). Run via the
+// DEPRECATED: 本包迭代2 删除（RPI 文档流迁至 team-context skills + multica CLI）。
+// Local MCP server (stdio transport, 13 SOP workflow tools). Run via the
 // `tcmcp-local` bin or `pnpm dev:local`. Library consumers can re-use the
 // tool handlers individually.
 export * from './tools/plan_create.js';

@@ -22,6 +22,8 @@ export interface DocPublishOutput {
 }
 
 /**
+ * DEPRECATED(迭代2删除·改用 multica issue comment add --inline / tc-render publish.py)
+ *
  * Publish a local doc to a multica issue as an APPEND-ONLY COMMENT whose body
  * embeds it via `!file[name](url)` (renders inline) and binds the upload. This
  * is the agent-facing path for filling a research_create skeleton or posting any
