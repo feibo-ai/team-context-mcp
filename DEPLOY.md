@@ -4,10 +4,10 @@ The remote MCP server (`@tcmcp/remote`) runs as the **`tcmcp-remote-gres`** serv
 on Zeabur, project **`teamctx`**. Public URL: **`https://mcp.teamctx.actionow.ai/mcp`**
 (health: `https://mcp.teamctx.actionow.ai/health`).
 
-> `@tcmcp/local` is **not** deployed here — it's a stdio server each team member runs
-> on their own machine (it touches their git working tree). See [INSTALL.md](./INSTALL.md).
-> multica (`multica-backend` / `multica-web` / `postgresql`) is deployed from a
-> **different repo**; this repo only owns `tcmcp-remote-gres`.
+> This repo only owns `tcmcp-remote-gres`. As of 0.3.0 there is no `@tcmcp/local` —
+> the former local stdio tools moved to team-context skills + the `multica` CLI
+> (see [INSTALL.md](./INSTALL.md)). multica (`multica-backend` / `multica-web` /
+> `postgresql`) is deployed from a **different repo**.
 
 ## CI/CD at a glance
 

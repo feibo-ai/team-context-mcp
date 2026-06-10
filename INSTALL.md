@@ -1,33 +1,30 @@
-# Install · v0.2 (hybrid · remote on Zeabur + local per-machine)
+# Install · v0.3.0 (remote-only · `@tcmcp/remote` on Zeabur)
 
 The remote server is already deployed on Zeabur — see [DEPLOY.md](./DEPLOY.md) for how
-it's built and operated. Most people only do the **light path** below: install the local
-stdio server and point your client at the always-on remote URL.
+it's built and operated. Team members only do the **light path** below: point your MCP
+client at the always-on remote URL. **There is nothing to build or run locally.**
+
+> **0.3.0 — `@tcmcp/local` removed (breaking).** The 13 former local stdio tools
+> (plan/research/case/handoff/skill_lint …) moved out of this repo: the RPI doc flow now
+> runs on team-context **skills + the `multica` CLI**. Pull skills with `multica skill pull --all`;
+> doc generation + inline publish goes through `skills/tc-render/publish.py`
+> (命门B = `multica issue comment add --inline`); skill lint is `multica skill lint`.
+> **This repo now ships only `@tcmcp/remote` (10 Feishu/SOP-broadcast tools).** Rationale:
+> [decisions/2026-06-08-drop-local-mcp.md](../team-context/decisions/2026-06-08-drop-local-mcp.md).
 
 ---
 
 ## Team members (most people · light path)
 
-> ⚠️ **DEPRECATED — @tcmcp/local 已不再需要安装。** 下面 13 个 local 工具（plan/research/case/handoff/skill_lint 等）已全部迁出本包：RPI 文档流改用 team-context 的 **skills + `multica` CLI**——用 `multica skill pull --all` 拉取 skill，文档生成+内联发布走 `skills/tc-render/publish.py`（命门B = `multica issue comment add --inline`），skill lint 走 `multica skill lint`。**本节只保留 `@tcmcp/remote`（10 工具）的接入步骤；不要再 clone/build/wire `@tcmcp/local`。** （边界：删除范围仅 @tcmcp/local；@tcmcp/remote 保留。）
-
-You need only the local stdio server. The remote is already running at
-`https://mcp.teamctx.actionow.ai`.
+You wire one always-on remote server into your client. **No clone, no build.** The remote
+is running at `https://mcp.teamctx.actionow.ai`.
 
 Two values you provide yourself:
 - **Remote MCP URL** — `https://mcp.teamctx.actionow.ai/mcp`
 - **Your personal multica bearer token** — the same token the multica CLI uses;
   run `multica login`, then copy the `token` field from `~/.multica/config.json`
 
-### 1. Clone + build the local server
-
-```bash
-git clone git@github.com:feibo-ai/team-context-mcp.git ~/team-context-mcp
-cd ~/team-context-mcp
-pnpm install
-pnpm --filter '@tcmcp/local' build
-```
-
-### 2. Wire both servers into Claude Code
+### 1. Wire the remote server into Claude Code
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or the equivalent on Windows/Linux:
 
@@ -37,30 +34,38 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
     "tcmcp-remote": {
       "url": "https://mcp.teamctx.actionow.ai/mcp",
       "headers": { "Authorization": "Bearer <your-multica-token>" }
-    },
-    "tcmcp-local": {
-      "command": "node",
-      "args": ["/Users/<you>/team-context-mcp/packages/local/dist/server.js"]
     }
   }
 }
 ```
 
-Replace `<your-multica-token>` and `<you>` with your values. The remote URL and the local path are independent — failing to reach the remote server only disables the 10 Feishu/SOP-broadcast tools (you'll see them missing from `tools/list`); the 13 local git/file tools still work.
+Replace `<your-multica-token>` with your value. Failing to reach the remote server disables
+the 10 Feishu/SOP-broadcast tools (you'll see them missing from `tools/list`).
 
-### 3. Wire into Codex CLI (optional)
+### 2. Wire into Codex CLI (optional)
 
 ```bash
-codex mcp add tcmcp-local -- node /Users/<you>/team-context-mcp/packages/local/dist/server.js
 codex mcp add-http tcmcp-remote https://mcp.teamctx.actionow.ai/mcp \
   --header "Authorization: Bearer <your-multica-token>"
 ```
 
+### 3. Get the RPI doc-flow tools (formerly `@tcmcp/local`)
+
+The plan / research / case / handoff flow is no longer an MCP server — it lives in
+team-context skills + the `multica` CLI:
+
+```bash
+multica skill pull --all     # pull the tc-* skills into ~/.claude/skills
+```
+
+Doc generation + inline publish runs through `skills/tc-render/publish.py`; skill lint is
+`multica skill lint`. See [team-context](../team-context) for the skills themselves.
+
 ### 4. Verify
 
-Restart Claude Code / Codex. Ask "What tools do you have from tcmcp-remote and tcmcp-local?"
+Restart Claude Code / Codex. Ask "What tools do you have from `tcmcp-remote`?"
 
-Expected: **23 tools** total — 10 from `tcmcp-remote`, 13 from `tcmcp-local`. See [README.md](./README.md) for the breakdown.
+Expected: **10 tools** from `tcmcp-remote`. See [README.md](./README.md) for the breakdown.
 
 ---
 
@@ -174,10 +179,12 @@ If `multica_control_plane_enabled` is `false`: revisit the Pre-flight section. I
 
 ```bash
 multica issue create \
-  --project team-context-mcp \
-  --title "tcmcp-remote is live · v0.2" \
-  --body "URL: https://mcp.teamctx.actionow.ai/mcp · Each member runs \`multica login\` for their bearer · See INSTALL.md team-member path."
+  --project <project-uuid> \
+  --title "tcmcp-remote is live · v0.3.0" \
+  --description "URL: https://mcp.teamctx.actionow.ai/mcp · Each member runs \`multica login\` for their bearer · See INSTALL.md team-member path (no local build)."
 ```
+
+> Pass the project's full UUID (`multica project list --full-id`) — a name or 8-char short ID is rejected. Every issue lives under a project.
 
 ---
 
@@ -199,5 +206,5 @@ Deploy / redeploy / logs / env vars / token rotation for the Zeabur service live
 | `deployment` block missing in `/health` | Integration not resolved → `DeploymentTracker` not wired | Same as above; resolve control plane connectivity first |
 | `multica_reachable: false` | Network / DNS / auth | Confirm `MULTICA_URL` points at `http://multica-backend.zeabur.internal:8080` and the service token is valid |
 | `beats_failed` keeps growing | Heartbeat POSTs failing (auth or network) | Check deployment logs for `heartbeat failed: ...` lines |
-| Local tools missing in client | Wrong path to `packages/local/dist/server.js` | Run `pnpm --filter '@tcmcp/local' build` then check the absolute path |
+| No `tcmcp-remote` tools in client | Remote unreachable or bearer rejected | Confirm the URL + `Authorization` header in your client config; hit `/health` to confirm the server is up |
 | Rotation not picked up | WS disconnected — check logs for `MulticaConfigSource` backoff | Auto-recovers via exponential backoff (5s → 60s cap); if stuck > 1 min, `zeabur service restart` |
